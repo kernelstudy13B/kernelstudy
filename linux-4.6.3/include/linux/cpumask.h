@@ -14,6 +14,8 @@
 /* Don't assign or return these: may not be this big! */
 typedef struct cpumask { DECLARE_BITMAP(bits, NR_CPUS); } cpumask_t;
 
+/*struct cpumask(cpumask_t) : 
+*/
 /**
  * cpumask_bits - get the bits in a cpumask
  * @maskp: the struct cpumask *
@@ -271,7 +273,7 @@ unsigned int cpumask_local_spread(unsigned int i, int node);
  * @cpu: cpu number (< nr_cpu_ids)
  * @dstp: the cpumask pointer
  */
-static inline void cpumask_set_cpu(unsigned int cpu, struct cpumask *dstp)
+static inline void cpumask_set_cpu(unsigned int cpu, struct cpumask *dstp)    
 {
 	set_bit(cpumask_check(cpu), cpumask_bits(dstp));
 }
@@ -745,7 +747,8 @@ set_cpu_online(unsigned int cpu, bool online)
 {
 	if (online) {
 		cpumask_set_cpu(cpu, &__cpu_online_mask);
-		cpumask_set_cpu(cpu, &__cpu_active_mask);
+		cpumask_set_cpu(cpu, &__cpu_active_mask);//set_cpu_active에서도 호출.
+        
 	} else {
 		cpumask_clear_cpu(cpu, &__cpu_online_mask);
 	}
@@ -755,7 +758,7 @@ static inline void
 set_cpu_active(unsigned int cpu, bool active)
 {
 	if (active)
-		cpumask_set_cpu(cpu, &__cpu_active_mask);
+		cpumask_set_cpu(cpu, &__cpu_active_mask);//set_cpu_online에서도 호출.
 	else
 		cpumask_clear_cpu(cpu, &__cpu_active_mask);
 }

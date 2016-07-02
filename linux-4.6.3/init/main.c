@@ -486,6 +486,7 @@ asmlinkage __visible void __init start_kernel(void) //called by head.S
 	char *after_dashes;
 
 	set_task_stack_end_magic(&init_task);//2.6 이후로추가된 부분으로 추정.
+
 	smp_setup_processor_id();
 	
 	/*
@@ -513,10 +514,15 @@ asmlinkage __visible void __init start_kernel(void) //called by head.S
  * Interrupts are still disabled. Do necessary setups, then
  * enable them
  */
-	boot_cpu_init();
-	page_address_init();
+	boot_cpu_init(); //CPU의 상태를 나타내는 비트맵에 부팅을 수행 중인 CPU를 등록하는 함수.
+	page_address_init();//하이 메모리를 관리하는 함수.
+
+	//HIGHMEM : userspace에서 사용되는 메모리 공간. 매핑이 가변적임.
+	//LOWMEM  : kernelspace에서 사용되는 메모리 공간. 매핑이 변하지 않음.
+	//위의 하이 메모리는 LOWMEM, 즉 kernelspace의 ZONE_HIGHMEM을 지칭.
+	
 	pr_notice("%s", linux_banner);
-	setup_arch(&command_line);
+	setup_arch(&command_line);//아키텍처와 관련된 일련의 일들을 처리 하는 함수.
 	mm_init_cpumask(&init_mm);
 	setup_command_line(command_line);
 	setup_nr_cpu_ids();

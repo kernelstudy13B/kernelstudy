@@ -2829,7 +2829,10 @@ static inline void threadgroup_change_end(struct task_struct *tsk)
 #ifndef __HAVE_THREAD_FUNCTIONS
 
 #define task_thread_info(task)	((struct thread_info *)(task)->stack)
+/*task_struct에 있는 stack 필드를 형변환.*/
+/*stack 포인터가 thread_info 필드와 union 형태로서 같은 메모리에서 사용되고 있음.*/
 #define task_stack_page(task)	((task)->stack)
+
 
 static inline void setup_thread_stack(struct task_struct *p, struct task_struct *org)
 {

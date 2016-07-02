@@ -128,12 +128,12 @@ __mmap_switched_data:
 ENTRY(lookup_processor_type)
 	stmfd	sp!, {r4 - r6, r9, lr}
 	mov	r9, r0
-	bl	__lookup_processor_type
+	bl	__lookup_processor_type 
 	mov	r0, r5
 	ldmfd	sp!, {r4 - r6, r9, pc}
 ENDPROC(lookup_processor_type)
 
-	__FINIT
+	__FINIT //해당 매크로에 .previous 지시자가 담겨있다. 즉 현재사용 섹션 이전의 섹션으로 이동시켜줌.
 	.text
 
 /*
@@ -149,7 +149,7 @@ ENDPROC(lookup_processor_type)
  *	r5 = proc_info pointer in physical address space
  *	r9 = cpuid (preserved)
  */
-__lookup_processor_type:
+__lookup_processor_type: //
 	adr	r3, __lookup_processor_type_data
 	ldmia	r3, {r4 - r6}
 	sub	r3, r3, r4			@ get offset between virt&phys

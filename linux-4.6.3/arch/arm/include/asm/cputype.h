@@ -93,7 +93,7 @@ extern unsigned int processor_id;
 		    : "cc");						\
 		__val;							\
 	})
-
+    //mrc : proc_info_list를 부르는 명령어, 코프로세서 레지스터의 명령어를 ARM 레지스터로 읽어옴.
 /*
  * The memory clobber prevents gcc 4.5 from reordering the mrc before
  * any is_smp() tests, which can cause undefined instruction aborts on

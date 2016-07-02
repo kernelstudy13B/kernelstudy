@@ -241,7 +241,7 @@ static int __get_cpu_architecture(void)
 	return CPU_ARCH_ARMv7M;
 }
 #else
-static int __get_cpu_architecture(void)
+static int __get_cpu_architecture(void) //arm의 어떠한 architecture인지에 대한 정보를 얻는 함수.
 {
 	int cpu_arch;
 
@@ -585,6 +585,7 @@ void notrace cpu_init(void)
 u32 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = MPIDR_INVALID };
 
 void __init smp_setup_processor_id(void)
+/*smp : 동등한 입장에서의 processor*/
 {
 	int i;
 	u32 mpidr = is_smp() ? read_cpuid_mpidr() & MPIDR_HWID_BITMASK : 0;
@@ -677,7 +678,7 @@ static void __init smp_build_mpidr_hash(void)
 
 static void __init setup_processor(void)
 {
-	struct proc_info_list *list;
+	struct proc_info_list *list; //프로세스에 대한 정보를 담고 있는 구조체.
 
 	/*
 	 * locate processor in the list of supported processor
@@ -685,13 +686,14 @@ static void __init setup_processor(void)
 	 * entries in arch/arm/mm/proc-*.S
 	 */
 	list = lookup_processor_type(read_cpuid_id());
+	//lookup_processor_type : read_cpuid_id의 결과를 이용하여 cpu의 정보를 가져 오는 함수.
 	if (!list) {
 		pr_err("CPU configuration botched (ID %08x), unable to continue.\n",
 		       read_cpuid_id());
 		while (1);
 	}
 
-	cpu_name = list->cpu_name;
+	cpu_name = list->cpu_name; 
 	__cpu_architecture = __get_cpu_architecture();
 
 #ifdef MULTI_CPU
@@ -1012,8 +1014,12 @@ void __init hyp_mode_check(void)
 void __init setup_arch(char **cmdline_p)
 {
 	const struct machine_desc *mdesc;
-
-	setup_processor();
+	//커널을 구동하는 machine(또는 architecture)의 정보를 담은 지시자. 각 정보와 콜백 필드들이 있음.
+	
+	//unwind_init(); -- 4.6.3버전에서는 사용하지 않는 함수.
+	
+	setup_processor();//현재 커널이 수행되고 있는 프로세스의 정보 설정
+	
 	mdesc = setup_machine_fdt(__atags_pointer);
 	if (!mdesc)
 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);

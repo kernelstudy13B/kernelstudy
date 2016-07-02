@@ -1698,13 +1698,32 @@ void init_cpu_online(const struct cpumask *src)
  */
 void __init boot_cpu_init(void)
 {
-	int cpu = smp_processor_id();
+	int cpu = smp_processor_id();//debug_smp_processor_id 또는 raw_smp_processor_id 수행.
+	
+	//hotplug : 컴퓨터의 전원을 넣은 채로 주변 장치나 코드를 꽂고(plug-in) 빼기(plug-out) 하는 것.
 
 	/* Mark the boot cpu "present", "online" etc for SMP and UP case */
 	set_cpu_online(cpu, true);
+	//온라인(사용중인 상태)되어 있는 모든 CPU에 대한 비트들을 1로 설정.
 	set_cpu_active(cpu, true);
+	
+	/*active :
+	cpu up/down에 사용
+	CPU가 hotplug되어 준비된 상태(present=true, active=false)에서 
+	cpu up 하면 스케쥴링 상태(active=true, online=true)로 변경됨.
+	스케쥴링 상태(online=true, active=true)에서 cpu down 하면 두 단계로 나뉘어 상태가 바뀐다.
+	더 이상 스케쥴링 하지 않는 상태(active=false, online=true)
+	이어서 조만간 완전히 기동을 멈춘 상태(active=false, online=false)로 바뀜
+	runqueue migration 등에 사용됨.
+	*/
+
 	set_cpu_present(cpu, true);
-	set_cpu_possible(cpu, true);
+	//장착되어 cpu가 인식된 상태.
+	//cpu가현재 시스템에서 인식이 된 경우에만 present 상태(possible의 부분집합)
+	
+	set_cdpu_possible(cpu, true);
+	//현재 동작 혹은 hotplug가 가능한 상태.
+	//부팅 시 고정되는 비트로써 상태 변동이 불가능.
 }
 
 /*

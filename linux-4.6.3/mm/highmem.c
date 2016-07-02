@@ -482,6 +482,14 @@ void __init page_address_init(void)
 	for (i = 0; i < ARRAY_SIZE(page_address_htable); i++) {
 		INIT_LIST_HEAD(&page_address_htable[i].lh);
 		spin_lock_init(&page_address_htable[i].lock);
+
+		//하이 메모리 영역은 직접적으로 주소화 될 수 없는 메모리 페이지이므로
+		//하이메모리(ZONE_HIGHMEM)를 매핑하기 위해서 kmap()을 사용, HIGHMEM 중 할당된 메모리를 해시
+		//테이블인 page_address_htable 로 별도로 관리.
+		
+		//이 테이블은 128개의 슬롯으로 정해져 있다.(PA_HASH_ORDER=7)
+		//ZONE_DMA, ZONE_NORMAL은 1:1 direct 매핑, ZONE_HIGHMEM은 이 해시테이블을 이용(indirect).
+		
 	}
 }
 
