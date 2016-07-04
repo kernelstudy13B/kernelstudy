@@ -429,7 +429,7 @@ static void __init patch_aeabi_idiv(void)
 
 	pr_info("CPU: div instructions available: patching division code\n");
 
-	fn_addr = ((uintptr_t)&__aeabi_uidiv) & ~1;
+	fn_addr = ((uintptr_t)&__aeabi_uidiv) & ~1; // ~(0000 0001) -> 1111 1110 
 	asm ("" : "+g" (fn_addr));
 	((u32 *)fn_addr)[0] = udiv_instruction();
 	((u32 *)fn_addr)[1] = bx_lr_instruction();
@@ -686,6 +686,7 @@ static void __init setup_processor(void)
 	 * entries in arch/arm/mm/proc-*.S
 	 */
 	list = lookup_processor_type(read_cpuid_id());
+	//read_cpuid_id : architecture에 따라 cpuid를 읽어옴
 	//lookup_processor_type : read_cpuid_id의 결과를 이용하여 cpu의 정보를 가져 오는 함수.
 	if (!list) {
 		pr_err("CPU configuration botched (ID %08x), unable to continue.\n",
@@ -695,9 +696,10 @@ static void __init setup_processor(void)
 
 	cpu_name = list->cpu_name; 
 	__cpu_architecture = __get_cpu_architecture();
+	// cpu_architecture를 읽어옴
 
 #ifdef MULTI_CPU
-	processor = *list->proc;
+	processor = *(list->proc);
 #endif
 #ifdef MULTI_TLB
 	cpu_tlb = *list->tlb;
@@ -717,22 +719,28 @@ static void __init setup_processor(void)
 		 list->arch_name, ENDIANNESS);
 	snprintf(elf_platform, ELF_PLATFORM_SIZE, "%s%c",
 		 list->elf_name, ENDIANNESS);
-	elf_hwcap = list->elf_hwcap;
+	elf_hwcap = list->elf_hwcap; // elf_hwcap : cpu 아키텍처에 따라서 지원하는 하드웨어들... 
 
-	cpuid_init_hwcaps();
-	patch_aeabi_idiv();
+	cpuid_init_hwcaps(); // elf_hwcap 변수를 이용해서 어떤 하드웨어를 지원하는 지 비트연산을 통해 긁어옴 
+	patch_aeabi_idiv(); // cpu 아키텍처에 따른 div 연산을 patch 
 
 #ifndef CONFIG_ARM_THUMB
-	elf_hwcap &= ~(HWCAP_THUMB | HWCAP_IDIVT);
+	elf_hwcap &= ~(HWCAP_THUMB | HWCAP_IDIVT); // thumb 연산이 가능한지? idivt 연산이 가능한지 
+	// bit set
 #endif
 #ifdef CONFIG_MMU
 	init_default_cache_policy(list->__cpu_mm_mmu_flags);
+	// list->__cpu_mm_mmu_flags 에 저장되어있는 policy 캐시 정책 설정
+	// TLB에 대한 정책 설정
+	// pmd, pte, 2단계 페이지 테이블 이용하는듯... pmd가 1차 테이블
 #endif
 	erratum_a15_798181_init();
-
+	// 아키텍처에 따른 에러처리???
 	elf_hwcap_fixup();
-
+	// 아키텍처에 따라 생길 수 있는 오류를 보정
 	cacheid_init();
+	// CPU 아키텍처에 따라 캐시 타입을 설정 캐시 타입에는 네가지가 있음
+	// PIPT, VIVT, VIPT, PIVT(이론 상으로만 존재) 
 	cpu_init();
 }
 

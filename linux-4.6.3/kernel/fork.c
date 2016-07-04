@@ -334,7 +334,6 @@ int __weak arch_dup_task_struct(struct task_struct *dst,
 
 void set_task_stack_end_magic(struct task_struct *tsk)
 {
-	
 	unsigned long *stackend;
 
 	stackend = end_of_stack(tsk);
