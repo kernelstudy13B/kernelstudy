@@ -590,6 +590,8 @@ void __init smp_setup_processor_id(void)
 	int i;
 	u32 mpidr = is_smp() ? read_cpuid_mpidr() & MPIDR_HWID_BITMASK : 0;
 	u32 cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+	//읽어온 mpidr로 해당 affinity_level(cpu의 고유 물리 번호)의 값을 추출. 
+	//현재 코어의 개수를 가져오는 함수....
 	//u32 : 32비트 unsigned int
 
 	cpu_logical_map(0) = cpu;

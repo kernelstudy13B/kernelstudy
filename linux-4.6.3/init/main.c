@@ -479,9 +479,20 @@ static void __init mm_init(void)
 
 asmlinkage __visible void __init start_kernel(void) //called by head.S 
 {
-	//asmlinkage : 어셈블리에서 C의 함수를 사용하기 위해 사용됨. 전달방식은 스택.
-	//__visible : linking에 대해 최적화를 위한 옵션.
-	//
+	/* asmlinkage : 어셈블리 코드에서 직접 호출(링크)할 수 있다는 의미.
+	 * 본 함수는 void 리턴형이지만 CPU 스택 사용에 통일성을 주는 키워드
+	 * 호출 규약에 대한 통일성을 주기 위해 필요함	
+	 *
+	 * __visible : LTO기능과 관련, 함수가 한번만 호출되는 함수의 경우 
+	 * 컴파일러가 자동으로 inline화 하는 경우가 있어 이를 막음으로써	
+	 * 함수를 심볼화하여 외부에서 볼 수 있게하는 키워드
+	 *
+	 * __init : 이 키워드로 지정된 함수는 커널 초기화 과정 이후에
+	 * 해제되는 메모리 영역에 배치함으로서 낭비되는 메모리를 확보할 수 있다.
+	 *
+	 *
+	 */	
+
 	char *command_line; //(추정) 쉘에서 입력되는 명령어 라인.
 	char *after_dashes;
 
