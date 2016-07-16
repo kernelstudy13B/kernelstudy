@@ -13,7 +13,7 @@
  */
 #ifndef CONFIG_NR_CPUS
 /* FIXME: This should be fixed in the arch's Kconfig */
-#define CONFIG_NR_CPUS	1
+#define CONFIG_NR_CPUS	1 //kernel config에 따라 달라지는 값(default는 1)
 #endif
 
 /* Places which use this should consider cpumask_var_t. */

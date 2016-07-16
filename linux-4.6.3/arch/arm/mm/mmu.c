@@ -133,18 +133,28 @@ static unsigned long initial_pmd_value __initdata = 0;
  */
 void __init init_default_cache_policy(unsigned long pmd)
 {
+	//pmd : 실제로 32비트에서는 pmd에 대한 할당이 존재하지 않음.
+	//32비트 arm에서는 실제로 pgd, pte만 존재.
+
+	//cachepolicy 전역변수에 아키텍처가 지원하는 1차페이지테이블의 캐시정책 값을 대입
 	int i;
 
-	initial_pmd_value = pmd;
+	initial_pmd_value = pmd;//(arm 32비트에서는 1차 페이지 테이블이 pmd)
 
 	pmd &= PMD_SECT_TEX(1) | PMD_SECT_BUFFERABLE | PMD_SECT_CACHEABLE;
+	//page table 포맷에서 사용되는 TEX필드와 C(cacheable), B(bufferable)의 비트인코딩	 //비트인코딩을 함으로서 page shareable에 대한 여부, 메모리타입
+	//캐시의 descriptor에 대한 정의를 수행.
+
+	//통상적으로 L1은 inner, L2는 outer로 정의되지만 메모리타입과 descriptor의 정의에 따라 별도로 설정이 가능.
+	//
 
 	for (i = 0; i < ARRAY_SIZE(cache_policies); i++)
 		if (cache_policies[i].pmd == pmd) {
 			cachepolicy = i;
 			break;
 		}
-
+	//설정되어 있는 모든 cache policy들찾아 일치하는 pmd를 갖는 policy를 가질 경우
+	//i에 따라 인덱싱.
 	if (i == ARRAY_SIZE(cache_policies))
 		pr_err("ERROR: could not find cache policy\n");
 }

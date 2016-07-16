@@ -138,7 +138,7 @@ EXPORT_SYMBOL(outer_cache);
  */
 int __cpu_architecture __read_mostly = CPU_ARCH_UNKNOWN;
 
-struct stack {
+struct stack { //각 모드일때(irq,abt,und,fiq) 스택의 포인터를 가지는 구조체)
 	u32 irq[3];
 	u32 abt[3];
 	u32 und[3];
@@ -428,7 +428,9 @@ static void __init patch_aeabi_idiv(void)
 		return;
 
 	pr_info("CPU: div instructions available: patching division code\n");
-
+	
+	//나눗셈이 가능한 arch의 경우 어떠한 방식으로 division을 할지에 대한 
+	//handling을 정의.
 	fn_addr = ((uintptr_t)&__aeabi_uidiv) & ~1; // ~(0000 0001) -> 1111 1110 
 	asm ("" : "+g" (fn_addr));
 	((u32 *)fn_addr)[0] = udiv_instruction();
@@ -456,7 +458,7 @@ static void __init cpuid_init_hwcaps(void)
 
 	block = cpuid_feature_extract(CPUID_EXT_ISAR0, 24);
 	if (block >= 2)
-		elf_hwcap |= HWCAP_IDIVA;
+		elf_hwcap |= HWCAP_IDIVA; //bitmask 'or 연산'
 	if (block >= 1)
 		elf_hwcap |= HWCAP_IDIVT;
 
@@ -467,6 +469,7 @@ static void __init cpuid_init_hwcaps(void)
 
 	/* check for supported v8 Crypto instructions */
 	isar5 = read_cpuid_ext(CPUID_EXT_ISAR5);
+	
 
 	block = cpuid_feature_extract_field(isar5, 4);
 	if (block >= 2)
@@ -523,11 +526,13 @@ static void __init elf_hwcap_fixup(void)
  */
 void notrace cpu_init(void)
 {
+// notrace : 컴파일러가 컴파일을 할때 그 함수를 profiling을 하는 기능이 있는데 notrace키워드가 있을 경우 그러한 기능을 하지 않도록 하는 키워드.(no_instrument_function)
 #ifndef CONFIG_CPU_V7M
 	unsigned int cpu = smp_processor_id();
-	struct stack *stk = &stacks[cpu];
+	//프로세서의 번호를 알아냄.
+	struct stack *stk = &stacks[cpu];//stacks : 전역배열
 
-	if (cpu >= NR_CPUS) {
+	if (cpu >= NR_CPUS) { //NR_CPUS : 시스템이 지원할 수 있는 최대 CPU 개수.
 		pr_crit("CPU%u: bad primary CPU number\n", cpu);
 		BUG();
 	}
@@ -689,7 +694,10 @@ static void __init setup_processor(void)
 	 */
 	list = lookup_processor_type(read_cpuid_id());
 	//read_cpuid_id : architecture에 따라 cpuid를 읽어옴
-	//lookup_processor_type : read_cpuid_id의 결과를 이용하여 cpu의 정보를 가져 오는 함수.
+	//lookup_processor_type : read_cpuid_id의 결과를 이용하여 cpu의 정보를 가져 오는 함수. __lookup_processor_type 레이블에 있는 어셈블리 코드를 동일하게 수행하여 현재 프로세서에 해당하는 정보를 저장하는 proc_info_list에 대한 포인터를 가져옴.
+	//링커가 만들어 내는 별도의 섹션 공간에서 지원되는 프로세서 리스트를 검색.
+
+	
 	if (!list) {
 		pr_err("CPU configuration botched (ID %08x), unable to continue.\n",
 		       read_cpuid_id());
@@ -721,10 +729,15 @@ static void __init setup_processor(void)
 		 list->arch_name, ENDIANNESS);
 	snprintf(elf_platform, ELF_PLATFORM_SIZE, "%s%c",
 		 list->elf_name, ENDIANNESS);
-	elf_hwcap = list->elf_hwcap; // elf_hwcap : cpu 아키텍처에 따라서 지원하는 하드웨어들... 
+	elf_hwcap = list->elf_hwcap; 
+	// elf_hwcap : cpu 아키텍처에 따라서 지원하는 하드웨어들... 
+	//cpu가 어떤 명령어를 지원하는 알아내기위해 유저프로그램이 사용할수 있는 bitflag.
 
-	cpuid_init_hwcaps(); // elf_hwcap 변수를 이용해서 어떤 하드웨어를 지원하는 지 비트연산을 통해 긁어옴 
-	patch_aeabi_idiv(); // cpu 아키텍처에 따른 div 연산을 patch 
+	cpuid_init_hwcaps(); // elf_hwcap 변수를 이용해서 어떤 instruction set이 사용 가능한지   비트연산을 통해 초기화. 
+	patch_aeabi_idiv(); 
+	// cpu 아키텍처에 따른 div 연산을 patch(각 arch에 대한 division에 대한 지원 여부)
+	// aeabi : arm 아키텍처를 위한 application binary 인터페이스.
+	
 
 #ifndef CONFIG_ARM_THUMB
 	elf_hwcap &= ~(HWCAP_THUMB | HWCAP_IDIVT); // thumb 연산이 가능한지? idivt 연산이 가능한지 
@@ -733,17 +746,24 @@ static void __init setup_processor(void)
 #ifdef CONFIG_MMU
 	init_default_cache_policy(list->__cpu_mm_mmu_flags);
 	// list->__cpu_mm_mmu_flags 에 저장되어있는 policy 캐시 정책 설정
-	// TLB에 대한 정책 설정
+	// TLB에 대한 정책 설정(TLB : 가상메모리 주소를 물리메모리 주소로 변환하는 속도를 높이기 위한 캐시)
 	// pmd, pte, 2단계 페이지 테이블 이용하는듯... pmd가 1차 테이블
 #endif
+//751라인부터는 프로세서 자체의 캐시에 대한 초기화 함수 부분
+
 	erratum_a15_798181_init();
-	// 아키텍처에 따른 에러처리???
+	// 아키텍처에 따른 에러처리
+	// erratum = error
+	// 에러처리에 대해 핸들러를 할당, 초기화 하는 함수.
 	elf_hwcap_fixup();
 	// 아키텍처에 따라 생길 수 있는 오류를 보정
+	// 지원에 대한 오류를 cachedid_init 이전에 수정.
 	cacheid_init();
+	// 프로세서의 캐시 타입(TLB X)을 찾아 초기화를 하는 함수.
 	// CPU 아키텍처에 따라 캐시 타입을 설정 캐시 타입에는 네가지가 있음
-	// PIPT, VIVT, VIPT, PIVT(이론 상으로만 존재) 
+	// PIPT, VIVT, VIPT, (PIVT - 이론 상으로만 존재) 
 	cpu_init();
+	// ARM 예외 모드마다 스택을 지정.
 }
 
 void __init dump_machine_table(void)
