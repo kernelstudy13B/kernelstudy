@@ -169,7 +169,7 @@ ENDPROC(__lookup_processor_type)
 /*
  * Look in <asm/procinfo.h> for information about the __proc_info structure.
  */
-	.align	2
+	dr.align	2
 	.type	__lookup_processor_type_data, %object
 __lookup_processor_type_data:
 	.long	.

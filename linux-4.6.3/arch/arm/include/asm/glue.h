@@ -16,7 +16,7 @@
 #ifdef __KERNEL__
 
 #ifdef __STDC__
-#define ____glue(name,fn)	name##fn
+#define ____glue(name,fn)	name##fn // ## : 두개의 토큰을 이어준다. 
 #else
 #define ____glue(name,fn)	name/**/fn
 #endif

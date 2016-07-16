@@ -207,21 +207,25 @@ static const void * __init arch_get_next_mach(const char *const **match)
  * If a dtb was passed to the kernel in r2, then use it to choose the
  * correct machine_desc and to setup the system.
  */
+// device tree : 하드웨어를 서술하기 위한 데이터 구조와 언어....?
 const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
 {
 	const struct machine_desc *mdesc, *mdesc_best = NULL;
 
 #if defined(CONFIG_ARCH_MULTIPLATFORM) || defined(CONFIG_ARM_SINGLE_ARMV7M)
-	DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
+	DT_MACHINE_START(GENERIC_DT, "Generic DT based system") // 구조체 관련 설정
 	MACHINE_END
 
 	mdesc_best = &__mach_desc_GENERIC_DT;
 #endif
-
-	if (!dt_phys || !early_init_dt_verify(phys_to_virt(dt_phys)))
+	// head.S 에서 pv_table 설정이 되있음
+	// early_init_dt_verify : 디바이스 트리 물리 주소가 이상있는지 확인
+	if (!dt_phys || !early_init_dt_verify(phys_to_virt(dt_phys))) 
 		return NULL;
 
 	mdesc = of_flat_dt_match_machine(mdesc_best, arch_get_next_mach);
+	// device tree에 맞는 machine을 찾아 machine_desc 구조체를 리턴
+	//  
 
 	if (!mdesc) {
 		const char *prop;
@@ -248,6 +252,7 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
 		mdesc->dt_fixup();
 
 	early_init_dt_scan_nodes();
+	//  
 
 	/* Change machine number to match the mdesc we're using */
 	__machine_arch_type = mdesc->nr;

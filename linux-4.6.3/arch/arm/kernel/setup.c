@@ -542,8 +542,13 @@ void notrace cpu_init(void)
 	 * boot cpu, smp_prepare_boot_cpu is called after percpu area setup.
 	 */
 	set_my_cpu_offset(per_cpu_offset(cpu));
+	// per_cpu 주소를 setting 한다.
+	// per_cpu : memory 영역을 cpu 별로 분리한다.  
 
 	cpu_proc_init();
+	// "CPU_NAME" + "_proc_init" 의 이름의 함수를 호출 
+	// arch/arm/mm/proc-* 이름의 파일로 함수들이 구현되어 있음
+	//
 
 	/*
 	 * Define the placement constraint for the inline asm directive below.
@@ -558,8 +563,9 @@ void notrace cpu_init(void)
 	/*
 	 * setup stacks for re-entrant exception handlers
 	 */
+	 // stack 주소 초기화 
 	__asm__ (
-	"msr	cpsr_c, %1\n\t"
+	"msr	cpsr_c, %1\n\t"  // msr dest src (intel syntax..?) cpsr_c 
 	"add	r14, %0, %2\n\t"
 	"mov	sp, r14\n\t"
 	"msr	cpsr_c, %3\n\t"
@@ -573,16 +579,17 @@ void notrace cpu_init(void)
 	"mov	sp, r14\n\t"
 	"msr	cpsr_c, %9"
 	    :
-	    : "r" (stk),
-	      PLC (PSR_F_BIT | PSR_I_BIT | IRQ_MODE),
-	      "I" (offsetof(struct stack, irq[0])),
+	    : "r" (stk), // %0
+		// Fast interupt mask, interupt, 
+	      PLC (PSR_F_BIT | PSR_I_BIT | IRQ_MODE), // %1, PLC :  r 또는 I 
+	      "I" (offsetof(struct stack, irq[0])), // %2
 	      PLC (PSR_F_BIT | PSR_I_BIT | ABT_MODE),
 	      "I" (offsetof(struct stack, abt[0])),
 	      PLC (PSR_F_BIT | PSR_I_BIT | UND_MODE),
 	      "I" (offsetof(struct stack, und[0])),
 	      PLC (PSR_F_BIT | PSR_I_BIT | FIQ_MODE),
 	      "I" (offsetof(struct stack, fiq[0])),
-	      PLC (PSR_F_BIT | PSR_I_BIT | SVC_MODE)
+	      PLC (PSR_F_BIT | PSR_I_BIT | SVC_MODE) // %9
 	    : "r14");
 #endif
 }
@@ -1050,7 +1057,7 @@ void __init setup_arch(char **cmdline_p)
 	
 	setup_processor();//현재 커널이 수행되고 있는 프로세스의 정보 설정
 	
-	mdesc = setup_machine_fdt(__atags_pointer);
+	mdesc = setup_machine_fdt(__atags_pointer); // __atgas_pointer : 부트로더로부터 전달된 파라미터
 	if (!mdesc)
 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
 	machine_desc = mdesc;

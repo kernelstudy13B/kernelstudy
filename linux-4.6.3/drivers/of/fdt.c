@@ -99,7 +99,7 @@ int of_fdt_is_compatible(const void *blob,
 		return 0;
 	while (cplen > 0) {
 		score++;
-		if (of_compat_cmp(cp, compat, strlen(compat)) == 0)
+		if (of_compat_cmp(cp, compat, strlen(compat)) == 0) // 이름을 비교
 			return score;
 		l = strlen(cp) + 1;
 		cp += l;
@@ -623,6 +623,7 @@ void __init early_init_fdt_reserve_self(void)
  * used to extract the memory information at boot before we can
  * unflatten the tree
  */
+// 디바이스 트리의 모든 노드를 뒤져 '/'로 시작하는 모든 노드에 대해 it 함수 호출
 int __init of_scan_flat_dt(int (*it)(unsigned long node,
 				     const char *uname, int depth,
 				     void *data),
@@ -728,8 +729,8 @@ const void * __init of_flat_dt_match_machine(const void *default_match,
 	unsigned long dt_root;
 	unsigned int best_score = ~1, score = 0;
 
-	dt_root = of_get_flat_dt_root();
-	while ((data = get_next_compat(&compat))) {
+	dt_root = of_get_flat_dt_root();		
+	while ((data = get_next_compat(&compat))) { // compatible 문자열 비교를 통해  score매김, 호환성 체크  score가 작을 수록 best_data 
 		score = of_flat_dt_match(dt_root, compat);
 		if (score > 0 && score < best_score) {
 			best_data = data;
@@ -1087,12 +1088,41 @@ bool __init early_init_dt_verify(void *params)
 void __init early_init_dt_scan_nodes(void)
 {
 	/* Retrieve various information from the /chosen node */
+	// boot_command_line 채우기, initrd-start,initrd-end 저장
+	// initrd-start : 초기화를 위한 파일시스템
+	//  ramdisk의 크기, 시작 주소, 끝 주소를 입력
 	of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line);
 
 	/* Initialize {size,address}-cells info */
+	// root (depth 0) size를 표현하는 cell의 수(size-cell), address를 표현하는 cell의 수(address-cell)
+	// cell : 
+	// device 를 조작하기 위해서 device 주소를 표현하는 속성은
+	// #address-cells, #size-cells, reg가 존재
+	// 부모 노드에 지정(address-cells, size-cells) 자식 노드에 지정 (reg)
+	// ex) reg = < address-cell1, size-cell1, address-cell2, size-cell2, .....>
+	// 
+/*
+		parent {
+			#address-cells = <2>;
+			#size-cells = <1>;
+			child {
+							:
+						reg = <0xC0000000 0x0000 1024>;
+							: 
+			};
+			child {
+							:
+						reg = <0xD0000000 0x0000 1024 0xE0000000 0x0000 2048>;
+							: 
+			};
+		};
+*/
+
 	of_scan_flat_dt(early_init_dt_scan_root, NULL);
 
 	/* Setup memory, calling early_init_dt_add_memory_arch */
+	// 메모리 사용을 위해 memory device tree를 찾아서 메모리 설정을함
+	// 즉, 메모리 사용을 위해 메모리에 자리를 마련해줌 
 	of_scan_flat_dt(early_init_dt_scan_memory, NULL);
 }
 
