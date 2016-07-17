@@ -1,0 +1,127 @@
+__lookup_processor_type()
+http://jake.dothome.co.kr/__lookup_processor_type/
+
+elf_hwcap
+http://lxr.free-electrons.com/source/arch/arm/include/asm/hwcap.h#L11
+
+__init_default_cache_policy()
+
+[고준호] [오후 4:59] http://egloos.zum.com/studyfoss/v/5008142
+[고준호] [오후 4:59] #pagetable
+[문용식] [오후 5:06] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0333h/Babifihd.html
+[문용식] [오후 5:06] PMD_SECT_TEX(1) | PMD_SECT_BUFFERABLE | PMD_SECT_CACHEABLE; 에 관한 자료
+[문용식] [오후 5:15]
+메모리 타입이 Normal의 Description를 보시면 Outer, Inner라는 것이 있는데,
+이것은 캐시를 의미합니다. 만약, 시스템의 메모리 계층이
+CORE <-> L1 명렁어/데이터 캐쉬 <-> L2 캐쉬 <-> 메모리  이렇게 가장 기본적인 형태로 되어 있다고 하면
+일반적으로 L1 캐시를 Inner로 설정하고, L2 캐시를 Outer로 설정해서 사용합니다.
+캐시는 시스템에 따라 많은 계층을 가질 수 있고,
+시스템 프로그래머가 시스템 특성에 맞게 캐시를 Inner와 Outer로 설정할 수 있습니다.
+Inner와 Outer 별로 캐쉬 정책을 설정 할 수 있다는 것만 알아두도록 합시다.
+[문용식] [오후 5:20] http://kth3321.blogspot.kr/2013/06/arm-cortex-2.html
+[임준수] [오후 5:21] Multiple TLBs[edit]
+Similar to caches, TLBs may have multiple levels. CPUs can be (and nowadays usually are)
+ built with multiple TLBs, for example a small "L1" TLB (potentially fully associative)
+ that is extremely fast, and a larger "L2" TLB that is somewhat slower.
+ When ITLB and DTLB are used, a CPU can have three (ITLB1, DTLB1, TLB2) or four TLBs.
+For instance, Intel's Nehalem microarchitecture
+has a four-way set associative L1 DTLB with 64 entries for 4 KiB pages and 32 entries
+for 2/4 MiB pages, an L1 ITLB with 128 entries for 4 KiB pages using four-way associativity and
+14 fully associative entries for 2/4 MiB pages (both parts of the ITLB divided statically
+between two threads)[6] and a unified 512-entry L2 TLB for 4 KiB pages,[7]
+ both 4-way associative.[8]
+Some TLBs may have separate sections for small pages and huge pages.
+[고준호] [오후 5:21] http://egloos.zum.com/studyfoss/v/5008142
+
+http://jake.dothome.co.kr/pt/
+ARM 32비트에서 구동하는 리눅스는 3단계 레벨의 페이지 테이블을 사용한다.
+•속성 비트가 리눅스와 ARM h/w가 서로 일부 지원되지 않는 비트가 있어서
+pte 테이블의 경우 linux pt와 hw pt로 나누어서 동시에 유지 관리를 하며 사용한다.
+•대용량의 메모리를 지원하는 LPAE 옵션에 따라 다른 관리 방법을 사용한다.
+◦LPAE를 지원하는 경우 리눅스나 ARM h/w 모두 3단계의 페이지 테이블 관리를 그대로 사용한다.
+◦LPAE를 지원하지 않는 일반적인 경우에는 리눅스는 3단계 페이지 테이블 관리를 사용하고
+ARM h/w는 2단계 페이지 테이블 관리를 사용해야 하므로 별도의 관리 방법을 사용하여 구현되었다.
+
+void erratum_a15_798181_init(void)
+
+https://patchwork.kernel.org/patch/9086361/
+
+void notrace cpu_init(void)
+http://studyfoss.egloos.com/5375570
+#percpu
+http://jake.dothome.co.kr/attr1/
+http://stackcanary.com/?p=505
+
+const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+
+[ㅇㅇ] [오후 7:45] http://jake.dothome.co.kr/setup_machine_fdt/
+[ㅇㅇ] [오후 7:48] http://forum.falinux.com/zbxe/index.php?document_srl=589850&mid=lecture_tip
+[김성원] [오후 7:48] Welcome to devicetree.org
+If you are looking for the devicetree specification youâ€™ve come to the right place!
+
+Devicetree.org is a community effort by many companies and individuals to
+ facilitate the future evolution of the Devicetree Standard.
+
+The devicetree is a data structure for describing ha..
+[문용식] [오후 7:49] http://blog.dasomoli.org/491
+[문용식] [오후 7:53] Its the list of parameters passed from the bootloader to the kernel.
+These atag_list is a predefined structure which a bootloader can fill
+and place at a location in RAM, whose address is passed to kernel
+startup as a parameter. Typical things that can be passed are MAC
+address of the box, initrd info etc.,
+
+Thanks
+Syed
+[문용식] [오후 8:01] http://jake.dothome.co.kr/stext/
+[문용식] [오후 8:03] http://jake.dothome.co.kr/__fixup_pv_table/
+[문용식] [오후 8:32] 사진
+[문용식] [오후 8:32] device tree 구조
+[문용식] [오후 8:50] 초기 부팅 동안, 아키텍처 셋업 코드는 페이징이 셋업되기 전에 디바이스
+
+트리를 파싱하는 다른 헬퍼 콜백들과 of_scan_flat_dt()를 여러번 호출합니다.
+
+of_scan_flat_dt() 코드는 디바이스 트리를 스캔하고 초기 부팅 동안 필요한
+
+정보를 추출하는 헬퍼를 사용합니다. 일반적으로 early_init_dt_scan_chosen()
+
+헬퍼는 커널 파라미터를 포함하는 chosen 노드를 파싱하는데,
+
+early_init_dt_scan_root()는 DT 주소 공간 모델을 초기화하는데, 그리고,
+
+early_init_dt_scan_memory()는 사용 가능한 RAM의 위치와 크기를 결정하는데
+
+사용됩니다.
+[김성원] [오후 8:54] http://forum.falinux.com/zbxe/index.php?document_srl=589850&mid=lecture_tip
+[ㅇㅇ] [오후 8:54] http://blog.dasomoli.org/491
+[문용식] [오후 8:55] The Flattened Device Tree is...
+
+The Flattened Device Tree (FDT) is a data structure. Nothing more.
+
+It describes a machine hardware configuration. It is derived from the
+device tree format used by Open Firmware.
+The format is expressive and able to describe most board design aspects including:
+ the number and type of CPUs
+ base addresses and size of RAM
+ busses and bridges
+ peripheral device connections
+ interrupt controllers and IRQ line connections
+ pin multiplexing
+
+Just like initrd images, an FDT image can either be statically linked into the kernel or
+passed to the kernel at boot time.
+[박동진] [오후 8:55] 사진
+[박동진] [오후 8:55] 맞을진 모르겠네요...ㅎㅎ;
+[경민] [오후 8:56] https://wiki.freebsd.org/FlattenedDeviceTree#Flattened_Device_Tree
+[경민] [오후 8:56] The concept of a flattened device tree (FDT) is an established and
+mature way of handling such problems and has been successfully used for
+Linux/powerpc. It has also been adopted as a basis for Power.org's embedded
+platform reference specification (ePAPR).
+[ㅇㅇ] [오후 9:02] http://jake.dothome.co.kr/setup_machine_fdt/
+[문용식] [오후 9:08] initrd 는 부트 로더에 의해 RAM 디스크를 읽어 들이는 능력을 제공한다.
+이 RAM 디스크는 그 후에 루트 파일시스템으로 마운트되어 프로그램들이
+그것으로부터 실행될 수 있다. 그 후에, 새로운 루트 파일 시스템이 다른 장치로부터
+마운트 될 수 있다. 그 후 이전의 루트 (initrd 로부터) 는 디렉토리로 옮겨지고
+결국 언마운트 될 수 있다.
+[문용식] [오후 9:14] http://forum.falinux.com/zbxe/?mid=lecture_tip&comment_srl=518031&l=es&sort_index=readed_count&order_type=asc&document_srl=784583
+[임준수] [오후 9:16] 220 #define OF_ROOT_NODE_ADDR_CELLS_DEFAULT 1
+221 #define OF_ROOT_NODE_SIZE_CELLS_DEFAULT 1
