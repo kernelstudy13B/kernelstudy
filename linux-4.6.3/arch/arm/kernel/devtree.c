@@ -225,7 +225,6 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
 
 	mdesc = of_flat_dt_match_machine(mdesc_best, arch_get_next_mach);
 	// device tree에 맞는 machine을 찾아 machine_desc 구조체를 리턴
-	//  
 
 	if (!mdesc) {
 		const char *prop;

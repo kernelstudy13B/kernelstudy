@@ -1056,9 +1056,21 @@ void __init setup_arch(char **cmdline_p)
 	//unwind_init(); -- 4.6.3버전에서는 사용하지 않는 함수.
 	
 	setup_processor();//현재 커널이 수행되고 있는 프로세스의 정보 설정
-	
+
+	/*
+	ATAG( ARM tag, bootloader로 부터 넘어 오는 정보)
+	AAPCS(Procedure Call Standard for the ARM Architecture) 표준을 다를 때 부트로더로부터
+	4개의 인자를 전달 받으며, r0 = 0, r1 = architecture ID, r2 = tagged list 포인터가 넘어온다.
+	tagged list 는 struct tags의 배열로 구성되며, memory, video, initrd, revision, cmdline 등의 정보를 포함한다.
+	덮여 쓰여지면 안되기 때문에, 주로 RAM의 16KB에 위치하게 된다.
+	bootloader 에서도 아키텍처에 대한 어느정도의 설정을 하는듯????
+	ATAG  방식이 예전부터 사용해오던 방식이며, 다양한 하드웨어 지원하기 위해서 
+	device tree 자료구조를 정의하였음. powerpc 계열과 sparc 플랫폼에서 주로 사용되었기 때문에 
+	powerpc 계열에서 사용되던 이름인 fdt(flattend device tree)라고 이름 지었음.
+	그래서 ATAG 방식과 device tree 방식 둘다를 지원해야함.   		
+	 */
 	mdesc = setup_machine_fdt(__atags_pointer); // __atgas_pointer : 부트로더로부터 전달된 파라미터
-	if (!mdesc)
+	if (!mdesc) // setup_machine_fdt 로 부터 machine_desc 구조체를 채울수 없으면 setup_machine_tags 호출
 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
 	machine_desc = mdesc;
 	machine_name = mdesc->name;

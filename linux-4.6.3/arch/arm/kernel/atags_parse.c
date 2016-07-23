@@ -145,18 +145,26 @@ __tagtable(ATAG_CMDLINE, parse_tag_cmdline);
  * The tag table is built by the linker from all the __tagtable
  * declarations.
  */
+
+/*
+  struct tagtable {
+      __u32 tag;
+	  int (*parse)(const struct tag *); 
+  };
+*/
 static int __init parse_tag(const struct tag *tag)
 {
 	extern struct tagtable __tagtable_begin, __tagtable_end;
 	struct tagtable *t;
 
+	// 해당 tag 에 대해 parsing을 수행할 함수를 찾아서 호출
 	for (t = &__tagtable_begin; t < &__tagtable_end; t++)
 		if (tag->hdr.tag == t->tag) {
 			t->parse(tag);
 			break;
 		}
 
-	return t < &__tagtable_end;
+	return t < &__tagtable_end;// 해당 tag를 처리할 함수를 찾았으면 true 
 }
 
 /*
@@ -185,12 +193,12 @@ setup_machine_tags(phys_addr_t __atags_pointer, unsigned int machine_nr)
 	const struct machine_desc *mdesc = NULL, *p;
 	char *from = default_command_line;
 
-	default_tags.mem.start = PHYS_OFFSET;
+	default_tags.mem.start = PHYS_OFFSET;// Kconfig 파일에서 정의된대로 결정됨
 
 	/*
 	 * locate machine in the list of supported machines.
 	 */
-	for_each_machine_desc(p)
+	for_each_machine_desc(p) // machine_nr 값이 같은 machine_desc를 찾음
 		if (machine_nr == p->nr) {
 			pr_info("Machine: %s\n", p->name);
 			mdesc = p;
@@ -203,9 +211,9 @@ setup_machine_tags(phys_addr_t __atags_pointer, unsigned int machine_nr)
 		dump_machine_table(); /* does not return */
 	}
 
-	if (__atags_pointer)
-		tags = phys_to_virt(__atags_pointer);
-	else if (mdesc->atag_offset)
+	if (__atags_pointer) // bootloader로부터 atag 를 사용할 경우
+		tags = phys_to_virt(__atags_pointer); // atags -> ARM tags 
+	else if (mdesc->atag_offset) // 찾은 mdesc에 atags가 설정된 경우 
 		tags = (void *)(PAGE_OFFSET + mdesc->atag_offset);
 
 #if defined(CONFIG_DEPRECATED_PARAM_STRUCT)
@@ -213,25 +221,40 @@ setup_machine_tags(phys_addr_t __atags_pointer, unsigned int machine_nr)
 	 * If we have the old style parameters, convert them to
 	 * a tag list.
 	 */
-	if (tags->hdr.tag != ATAG_CORE)
+	if (tags->hdr.tag != ATAG_CORE) // tags 구조체의 헤더의 태그가(시작이) ATAG_CORE가 아니면 변환 필요
 		convert_to_tag_list(tags);
 #endif
-	if (tags->hdr.tag != ATAG_CORE) {
+	if (tags->hdr.tag != ATAG_CORE) { 
 		early_print("Warning: Neither atags nor dtb found\n");
 		tags = (struct tag *)&default_tags;
 	}
 
+	// 특정 하드웨어나 펌웨어에 따라 문제가 있는 경우 패치하기 위한 함수가 있을 때 호출
+	// 예) mach-msm/board-msm7x30.c – msm7x30_fixup() 참고
+	/*
+	   static void __init msm7x30_fixup(struct tag *tag, char **cmdline,
+	   							struct meminfo *mi)
+	   {
+	   		for (; tag->hdr.size; tag = tag_next(tag))
+	  			 if (tag->hdr.tag == ATAG_MEM && tag->u.mem.start == 0x200000) {
+	   				tag->u.mem.start = 0;
+					tag->u.mem.size += SZ_2M;
+	   			 }
+	   }
+	 
+	 */
 	if (mdesc->fixup)
 		mdesc->fixup(tags, &from);
 
-	if (tags->hdr.tag == ATAG_CORE) {
-		if (memblock_phys_mem_size())
-			squash_mem_tags(tags);
-		save_atags(tags);
-		parse_tags(tags);
+	if (tags->hdr.tag == ATAG_CORE) { // 헤드에 ATAG_CORE 로 설정된 경우 
+		if (memblock_phys_mem_size()) // 메모리 사이즈가 이미 설정된 경우
+			squash_mem_tags(tags);    // ATAG_NONE이 taglist의 끝을 의미하는데 이미 메모리 사이즈가 결정되어 있으므로 메모리 설정을 할 필요가 없다. 그러므로 ATAG_MEM을 ATAG_NONE 으로 변경한다.
+		save_atags(tags); // atags_copy 변수에 tags  저장
+		parse_tags(tags); // taglist를 순회하면서 해당 tag를 parsing 할 함수를 찾아서 parsing 
 	}
 
 	/* parse_early_param needs a boot_command_line */
+	// boot_command_line 부팅 명령, uboot로부터 설정된 부팅 옵션을 저장 
 	strlcpy(boot_command_line, from, COMMAND_LINE_SIZE);
 
 	return mdesc;

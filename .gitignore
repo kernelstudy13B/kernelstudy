@@ -3,5 +3,7 @@ cscope.files
 cscope.out
 cscope.out.in
 cscope.out.po
+cscope.in.out
+cscope.po.out
 cscope.po
 file_list
