@@ -1087,6 +1087,7 @@ gpio : general purpose.
 	//init_mm : mm struct 구조체 변수. 0-idle프로세스 메모리 정보를 담고 있음. 
 	//			즉, 지금 동작하고 있는 이 부분이 결론적으로 idle task가 되며
 	//			여기에 대한 메모리 영역을 정의하는 구간.
+	//			init process 의 mm struct
 	//_text,_etext,_edata,_end는 arch/arm/kernel/vmlinux.lds.S에 정의 되어 있음.
 	init_mm.start_code = (unsigned long) _text;
 	init_mm.end_code   = (unsigned long) _etext;
@@ -1104,7 +1105,7 @@ gpio : general purpose.
 	*cmdline_p = cmd_line;
 	//setup_arch 함수의 매개변수에 cmd_line을 변경
 
-	early_fixmap_init();
+	early_fixmap_init(); // fixmap 영역 초기화
 	early_ioremap_init();
 
 	parse_early_param();

@@ -200,7 +200,7 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
 #endif
 
 #define pte_index(addr)		(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
-
+// 12bits pte table 내에서의 index를 잘라내고 주소에서 남은 8bit 만 남김 -> pte_index
 #define pte_offset_kernel(pmd,addr)	(pmd_page_vaddr(*(pmd)) + pte_index(addr))
 
 #define pte_offset_map(pmd,addr)	(__pte_map(pmd) + pte_index(addr))

@@ -63,6 +63,16 @@ static inline void __init __late_clear_fixmap(enum fixed_addresses idx)
 static void __iomem *prev_map[FIX_BTMAPS_SLOTS] __initdata;
 static unsigned long prev_size[FIX_BTMAPS_SLOTS] __initdata;
 static unsigned long slot_virt[FIX_BTMAPS_SLOTS] __initdata;
+/*
+ * http://blog.daum.net/_blog/BlogTypeView.do?blogid=0ZP6v&articleno=79&categoryId=1&regdt=20111121103300
+ * http://jake.dothome.co.kr/fixmap/
+ fixmap : process 가 할당 받을 수 메모리 영역 한 종류
+ fixmap 단위로 메모리를 분리해놓고 할당한다.
+FIX_BITMAPS_SLOTS : fixmap의 개수
+NR_FIX_BITMAPS : fixmap 하나를 구성하는 페이지의 개수
+slot_virt : 각 fixmap의 시작 주소(가상 주소)가 들어감
+prev_map : fixmap 의 이전 상태
+ */
 
 void __init early_ioremap_setup(void)
 {
@@ -72,7 +82,7 @@ void __init early_ioremap_setup(void)
 		if (WARN_ON(prev_map[i]))
 			break;
 
-	for (i = 0; i < FIX_BTMAPS_SLOTS; i++)
+	for (i = 0; i < FIX_BTMAPS_SLOTS; i++) 
 		slot_virt[i] = __fix_to_virt(FIX_BTMAP_BEGIN - NR_FIX_BTMAPS*i);
 }
 

@@ -372,6 +372,7 @@ static pte_t *(*pte_offset_fixmap)(pmd_t *dir, unsigned long addr);
 
 static pte_t bm_pte[PTRS_PER_PTE + PTE_HWTABLE_PTRS]
 	__aligned(PTE_HWTABLE_OFF + PTE_HWTABLE_SIZE) __initdata;
+// bm_pte : page table 
 
 static pte_t * __init pte_offset_early_fixmap(pmd_t *dir, unsigned long addr)
 {
@@ -400,6 +401,9 @@ void __init early_fixmap_init(void)
 	 * The early fixmap range spans multiple pmds, for which
 	 * we are not prepared:
 	 */
+	/*
+	 * ZONE_HIGHMEM 은 vmap, kmap, fixmap 영역으로 구분된다.
+	 */
 	BUILD_BUG_ON((__fix_to_virt(__end_of_early_ioremap_region) >> PMD_SHIFT)
 		     != FIXADDR_TOP >> PMD_SHIFT);
 
@@ -407,6 +411,7 @@ void __init early_fixmap_init(void)
 	pmd_populate_kernel(&init_mm, pmd, bm_pte);
 
 	pte_offset_fixmap = pte_offset_early_fixmap;
+	// 주어지는 addr 을 통해 pte table의 해당 pte 주소를 리턴 
 }
 
 /*

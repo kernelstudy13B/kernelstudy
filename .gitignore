@@ -7,3 +7,4 @@ cscope.in.out
 cscope.po.out
 cscope.po
 file_list
+*.swp
