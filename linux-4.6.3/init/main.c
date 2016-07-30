@@ -494,6 +494,7 @@ asmlinkage __visible void __init start_kernel(void) //called by head.S
 	 */	
 
 	char *command_line; //(추정) 쉘에서 입력되는 명령어 라인.
+						//부트로더를 실행할때의 컴파일 옵션(u-boot)등을 의미(쉘 x)
 	char *after_dashes;
 
 	set_task_stack_end_magic(&init_task);//2.6 이후로추가된 부분으로 추정.

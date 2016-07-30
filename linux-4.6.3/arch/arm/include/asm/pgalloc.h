@@ -133,8 +133,10 @@ static inline void __pmd_populate(pmd_t *pmdp, phys_addr_t pte,
 {
 	pmdval_t pmdval = (pte + PTE_HWTABLE_OFF) | prot;
 	pmdp[0] = __pmd(pmdval);
+	//__pmd : 형변환을 위한 매크로
 #ifndef CONFIG_ARM_LPAE
 	pmdp[1] = __pmd(pmdval + 256 * sizeof(pte_t));
+	//pmd 하나가 pte의 요소 256개를 가르킬수 있음.
 #endif
 	flush_pmd_entry(pmdp);
 }
@@ -151,6 +153,8 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
 	/*
 	 * The pmd must be loaded with the physical address of the PTE table
 	 */
+		//pmd는 반드시 pte 테이블의 물리주소와 함께 로드되어야 한다.
+		//__pa()함수를 통해 pte테이블의 물리주소가 리턴이 된다.
 	__pmd_populate(pmdp, __pa(ptep), _PAGE_KERNEL_TABLE);
 }
 

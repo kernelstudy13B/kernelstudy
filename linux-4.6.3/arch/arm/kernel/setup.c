@@ -1062,7 +1062,7 @@ void __init setup_arch(char **cmdline_p)
 	AAPCS(Procedure Call Standard for the ARM Architecture) 표준을 다를 때 부트로더로부터
 	4개의 인자를 전달 받으며, r0 = 0, r1 = architecture ID, r2 = tagged list 포인터가 넘어온다.
 	tagged list 는 struct tags의 배열로 구성되며, memory, video, initrd, revision, cmdline 등의 정보를 포함한다.
-	덮여 쓰여지면 안되기 때문에, 주로 RAM의 16KB에 위치하게 된다.
+	덮여 쓰여지면 안되기 때문에, 주로 RAM의 16KB에 위치하게 된다.(권장사항)
 	bootloader 에서도 아키텍처에 대한 어느정도의 설정을 하는듯????
 	ATAG  방식이 예전부터 사용해오던 방식이며, 다양한 하드웨어 지원하기 위해서 
 	device tree 자료구조를 정의하였음. powerpc 계열과 sparc 플랫폼에서 주로 사용되었기 때문에 
@@ -1074,19 +1074,35 @@ void __init setup_arch(char **cmdline_p)
 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
 	machine_desc = mdesc;
 	machine_name = mdesc->name;
-	dump_stack_set_arch_desc("%s", mdesc->name);
+	dump_stack_set_arch_desc("%s", mdesc->name);//mdesc의 이름을 출력.
 
 	if (mdesc->reboot_mode != REBOOT_HARD)
 		reboot_mode = mdesc->reboot_mode;
+	/*재부팅시 여러가지 모드가 존재.
+cold,hard : 컴퓨터 전원이 완전히 나간 후 다시 reboot.(디폴트)
+warm,soft : 컴퓨터 전원이 완전히 나가지 않은 상태에서 다시 reboot.
+gpio : general purpose.
+	*/
 
+	//init_mm : mm struct 구조체 변수. 0-idle프로세스 메모리 정보를 담고 있음. 
+	//			즉, 지금 동작하고 있는 이 부분이 결론적으로 idle task가 되며
+	//			여기에 대한 메모리 영역을 정의하는 구간.
+	//_text,_etext,_edata,_end는 arch/arm/kernel/vmlinux.lds.S에 정의 되어 있음.
 	init_mm.start_code = (unsigned long) _text;
 	init_mm.end_code   = (unsigned long) _etext;
 	init_mm.end_data   = (unsigned long) _edata;
 	init_mm.brk	   = (unsigned long) _end;
+	//초기 상태 : start_brk = brk = end_data
+	//https://sploitfun.wordpress.com/tag/heap/
+
+	/*코드의 시작이 data의 시작이므로 start_data를 명시해줄 필요는 없지만
+	  brk의 시작(heap의 시작)은 할당에 따라 변동.*/
 
 	/* populate cmd_line too for later use, preserving boot_command_line */
 	strlcpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
+	//차후 사용을 대비해 boot_command_line을 cmd_line에 복사.
 	*cmdline_p = cmd_line;
+	//setup_arch 함수의 매개변수에 cmd_line을 변경
 
 	early_fixmap_init();
 	early_ioremap_init();

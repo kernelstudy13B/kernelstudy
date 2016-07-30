@@ -386,7 +386,7 @@ static pte_t *pte_offset_late_fixmap(pmd_t *dir, unsigned long addr)
 static inline pmd_t * __init fixmap_pmd(unsigned long addr)
 {
 	pgd_t *pgd = pgd_offset_k(addr);
-	pud_t *pud = pud_offset(pgd, addr);
+	pud_t *pud = pud_offset(pgd, addr); //32비트이므로 바로 pmd를 리턴하는 함수.
 	pmd_t *pmd = pmd_offset(pud, addr);
 
 	return pmd;
