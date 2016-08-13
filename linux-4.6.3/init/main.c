@@ -411,13 +411,19 @@ static noinline void __init_refok rest_init(void)
 /* Check for early params. */
 static int __init do_early_param(char *param, char *val,
 				 const char *unused, void *arg)
+		//조건에 해당하는 커널 파라미터를 발견하면 val값 인수로 해당 커널 파라미터에 동록된 setup_arch() 함수를 호출
 {
 	const struct obs_kernel_param *p;
 
 	for (p = __setup_start; p < __setup_end; p++) {
 		if ((p->early && parameq(param, p->str)) ||
 		    (strcmp(param, "console") == 0 &&
-		     strcmp(p->str, "earlycon") == 0)
+		     strcmp(p->str, "earlycon") == 0)//이 함수에선 console, earlycon 두 토큰에 대한 필터링만 하는 것이 목적
+			/*
+			   1. 요청 바라미터가 커널 파라미터(str)과 같으면서 early 설정이 된 경우.
+			   2. 요청 파라미터가 console이고 커널 파라미터 str이 earlycon일때.
+			   --둘중 하나만 충족할 경우 밑에 setup_func() 함수가 호출이 된다.*/
+
 		) {
 			if (p->setup_func(val) != 0)
 				pr_warn("Malformed early option '%s'\n", param);
@@ -429,23 +435,30 @@ static int __init do_early_param(char *param, char *val,
 
 void __init parse_early_options(char *cmdline)
 {
+		//어떤 parameter를 parse 할것인지 정함.
+		//param에 null을 그리고 num에 전달하므로 각 토큰을 파싱하면 param과 val 값을 가지고 항상 unknown 핸들러인 do_early_param을 호출
 	parse_args("early options", cmdline, NULL, 0, 0, 0, NULL,
 		   do_early_param);
+	//parse_args함수에서 unknown 핸들러가 실행이 될대 do_early_param이 실행이 된다.
 }
 
 /* Arch code calls this early on, or if not, just before other parsing. */
+//아키텍처 코드에 따라 함수가 호출될수도 안될수도 있다.
 void __init parse_early_param(void)
 {
-	static int done __initdata;
+	static int done __initdata;//__initdata의 순서가 바뀌어도 가능.
 	static char tmp_cmdline[COMMAND_LINE_SIZE] __initdata;
 
-	if (done)
+	if (done)//static 변수인 done이므로 이 함수는 단 한번만 실행될 것.(early)
 		return;
 
 	/* All fall through to do_early_param. */
 	strlcpy(tmp_cmdline, boot_command_line, COMMAND_LINE_SIZE);
+	//boot_command_line은 계속 유지되어야 하는 command이므로 이 command를 tmp에 넣고 파싱을 할것.
 	parse_early_options(tmp_cmdline);
 	done = 1;
+
+	//정리 : tmp 커맨드라인으로 들어가는 command를 나뉘어지는 토큰에 따라 setup_func함수를 호출.
 }
 
 void __init __weak smp_setup_processor_id(void)

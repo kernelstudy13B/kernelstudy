@@ -176,6 +176,8 @@ static __init void reserve_regions(void)
 
 void __init efi_init(void)
 {
+	//부팅시 UEFI에 대한 초기화가 이루어지는 과정. UEFI에 사용될 메모리에 대한 초기화로 추정.
+	//efi : extensible firmware interface
 	struct efi_fdt_params params;
 
 	/* Grab UEFI information placed in FDT by stub */

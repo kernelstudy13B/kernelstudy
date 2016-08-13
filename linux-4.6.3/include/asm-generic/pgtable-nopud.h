@@ -37,7 +37,7 @@ static inline void pgd_clear(pgd_t *pgd)	{ }
 
 static inline pud_t * pud_offset(pgd_t * pgd, unsigned long address)
 {
-	return (pud_t *)pgd;
+	return (pud_t *)pgd;//32비트이므로 pud_offset인데도 불구하고 pgd를 리턴.
 }
 
 #define pud_val(x)				(pgd_val((x).pgd))

@@ -1509,6 +1509,7 @@ static void __init map_lowmem(void)
 #ifdef CONFIG_ARM_PV_FIXUP
 extern unsigned long __atags_pointer;
 typedef void pgtables_remap(long long offset, unsigned long pgd, void *bdata);
+//이 typedef를 거쳐서 리턴타입과 인자형을 쓰지 않아도 된다.
 pgtables_remap lpae_pgtables_remap_asm;
 
 /*
@@ -1517,6 +1518,7 @@ pgtables_remap lpae_pgtables_remap_asm;
  */
 void __init early_paging_init(const struct machine_desc *mdesc)
 {
+		//LPAE와 연관된 부분이라 페이징과 직접적인 연관의 가능성을 염두.
 	pgtables_remap *lpae_pgtables_remap;
 	unsigned long pa_pgd;
 	unsigned int cr, ttbcr;
@@ -1536,16 +1538,23 @@ void __init early_paging_init(const struct machine_desc *mdesc)
 	 * must get this prior to the pv update.  The following barrier
 	 * ensures that this is complete before we fixup any P:V offsets.
 	 */
+	//pa : physical address,가상주소를 물리주소르 바꾸는 매크로. LPAE에 호환되는 페이지테이블을 위한 과정으로 생각.
 	lpae_pgtables_remap = (pgtables_remap *)(unsigned long)__pa(lpae_pgtables_remap_asm);
-	pa_pgd = __pa(swapper_pg_dir);
-	boot_data = __va(__atags_pointer);
+	pa_pgd = __pa(swapper_pg_dir);//pgd가 배열로 존재하는데 그 배열의 첫번째 엔트리를 가르치는주소값을 인자로 함.(시작점 설정)
+	boot_data = __va(__atags_pointer);//부트로더로부터 받아온 데이터에 대한 가상주소를 받아옴.
 	barrier();
+	//1.시퓨나 컴파일러에게 특정 연산의 순서를 강제
+	//2.현재 수행중인 메모리 읽기쓰기가 모두 완료될떄까지 동기화 시켜주는 기능
+	//현재 barrier는 2번기능으로 추정.
 
 	pr_info("Switching physical address space to 0x%08llx\n",
 		(u64)PHYS_OFFSET + offset);
 
 	/* Re-set the phys pfn offset, and the pv offset */
+	//pv offset : 물리주소 - 가상주소
+	//pfn : page frame number, 페이지 프레임은 물리주소의 단위. 즉 물리주소와 연관된 오프셋.
 	__pv_offset += offset;
+	//keystone의 플랫폼의 특징을 기반으로 하는 경우 보정.
 	__pv_phys_pfn_offset += PFN_DOWN(offset);
 
 	/* Run the patch stub to update the constants */
@@ -1561,6 +1570,7 @@ void __init early_paging_init(const struct machine_desc *mdesc)
 	 * allocating into the caches too.  Note that this is ARMv7 LPAE
 	 * specific.
 	 */
+	//캐시와 tlb를 flush하는 부분
 	cr = get_cr();
 	set_cr(cr & ~(CR_I | CR_C));
 	asm("mrc p15, 0, %0, c2, c0, 2" : "=r" (ttbcr));
@@ -1574,15 +1584,17 @@ void __init early_paging_init(const struct machine_desc *mdesc)
 	 * needs to be assembly.  It's fairly simple, as we're using the
 	 * temporary tables setup by the initial assembly code.
 	 */
+	//
 	lpae_pgtables_remap(offset, pa_pgd, boot_data);
+	//페이지 테이블을 위한 remapping.
 
-	/* Re-enable the caches and cacheable TLB walks */
+	/* Re-enable the caches and cacheable TLB walks */ //flush과정에서 캐시를 사용하지 못했던 것을 다시 사용할 수 있도록 함.
 	asm volatile("mcr p15, 0, %0, c2, c0, 2" : : "r" (ttbcr));
 	set_cr(cr);
 }
 
 #else
-
+//이 함수는 LPAE와 무관.
 void __init early_paging_init(const struct machine_desc *mdesc)
 {
 	long long offset;
@@ -1590,13 +1602,16 @@ void __init early_paging_init(const struct machine_desc *mdesc)
 	if (!mdesc->pv_fixup)
 		return;
 
-	offset = mdesc->pv_fixup();
+	offset = mdesc->pv_fixup();//init_meminfo는 pv_fixup이란 명칭으로 변경
 	if (offset == 0)
 		return;
-
+//윗부분은 LPAE와 관련된 함수와 동일.
 	pr_crit("Physical address space modification is only to support Keystone2.\n");
 	pr_crit("Please enable ARM_LPAE and ARM_PATCH_PHYS_VIRT support to use this\n");
 	pr_crit("feature. Your kernel may crash now, have a good day.\n");
+	//물리주소공간 수정은 keystone2를 지원하기 위하 것. 따라서 ARM_LPAE 와 ARM_PATCH~가 이 기능을 사용할수 있도록 해야한다. 이러한 과정에서 커널이 충돌이 일어날수 있다.
+	//keystone2 : 여기서 말하는 물리 주소공간 수정이라는 feature는 keystone2의 플랫폼에서만 가능.
+	//LPAE와는 무관한 플랫폼으로 추정.
 	add_taint(TAINT_CPU_OUT_OF_SPEC, LOCKDEP_STILL_OK);
 }
 

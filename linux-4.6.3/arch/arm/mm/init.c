@@ -124,10 +124,13 @@ static void __init arm_adjust_dma_zone(unsigned long *size, unsigned long *hole,
 
 void __init setup_dma_zone(const struct machine_desc *mdesc)
 {
+		//부트로더로부터 설정된 값들을 삽입..ZONE_DMA 설정.
 #ifdef CONFIG_ZONE_DMA
 	if (mdesc->dma_zone_size) {
 		arm_dma_zone_size = mdesc->dma_zone_size;
+		//무조건 16MB가 아니라 그 이하의 공간으로도 가능하다.(x86의 경우)
 		arm_dma_limit = PHYS_OFFSET + arm_dma_zone_size - 1;
+		//PHYS_OFFSET(물리램주소)
 	} else
 		arm_dma_limit = 0xffffffff;
 	arm_dma_pfn_limit = arm_dma_limit >> PAGE_SHIFT;

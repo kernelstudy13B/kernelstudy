@@ -67,23 +67,34 @@ static unsigned long slot_virt[FIX_BTMAPS_SLOTS] __initdata;
  * http://blog.daum.net/_blog/BlogTypeView.do?blogid=0ZP6v&articleno=79&categoryId=1&regdt=20111121103300
  * http://jake.dothome.co.kr/fixmap/
  fixmap : process 가 할당 받을 수 메모리 영역 한 종류
- fixmap 단위로 메모리를 분리해놓고 할당한다.
-FIX_BITMAPS_SLOTS : fixmap의 개수
-NR_FIX_BITMAPS : fixmap 하나를 구성하는 페이지의 개수
-slot_virt : 각 fixmap의 시작 주소(가상 주소)가 들어감
-prev_map : fixmap 의 이전 상태
+ fixmap 영역이 슬롯단위 이므로  메모리를 분리해놓고 할당한다.
+FIX_BITMAPS_SLOTS : fixmap의 슬롯의 개수
+NR_FIX_BITMAPS : fixmap슬롯  하나를 구성하는 페이지의 개수
+slot_virt : 각 fixmap슬롯의 시작 주소(가상 주소)가 들어감
+prev_map : fixmap 의 이전 상태, slot_virt의 시작주소값을 넣어줌. 
  */
 
 void __init early_ioremap_setup(void)
+/*fixmap 재정리
+
+  fixmap : fix maped linear address space
+  		   커널이 부팅 전 초기화과정에서 이용할 메모리를 할당받을 수 있는 영역.
+  		   아주 극히 짧은 시간 동안 매ㅣㅇ하여 사용가능, fixmap address space에 매핑을 한다.
+		   */
 {
 	int i;
 
 	for (i = 0; i < FIX_BTMAPS_SLOTS; i++)
 		if (WARN_ON(prev_map[i]))
 			break;
-
+	
+	//fixmap에 대한 주소 할당 수행.
 	for (i = 0; i < FIX_BTMAPS_SLOTS; i++) 
 		slot_virt[i] = __fix_to_virt(FIX_BTMAP_BEGIN - NR_FIX_BTMAPS*i);
+		
+		
+	//slot_virt : fixmap의 시작주소(추측),fixmap을 구성하는 슬롯이 여러개가 있음.
+	//			  fixmap 영역을 슬롯이라는 단위로 나눈 후 그 슬롯단위를 기준으로 메모리를 할당.
 }
 
 static int __init check_early_ioremap_leak(void)

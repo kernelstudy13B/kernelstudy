@@ -1108,10 +1108,11 @@ gpio : general purpose.
 	early_fixmap_init(); // fixmap 영역 초기화
 	early_ioremap_init();
 
-	parse_early_param();
+	parse_early_param(); //tmp 커맨드라인으로 들어가는 command를 나뉘어지는 토큰에 따라 setup_func함수를 호출.
 
-#ifdef CONFIG_MMU
+#ifdef CONFIG_MMU //
 	early_paging_init(mdesc);
+	//LPAE와 관련이 있는 경우와 아닌경우로 나누어 메모리 정보에 대한 초기화를 하는 함수. 페이징에 대한 정보를 초기화하는 것이 아닌 페이징과 연관이 있을 메모리의 정보를 초기화.
 #endif
 	setup_dma_zone(mdesc);
 	efi_init();

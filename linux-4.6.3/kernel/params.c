@@ -213,6 +213,9 @@ static char *next_arg(char *args, char **param, char **val)
 }
 
 /* Args looks like "foo=bar,bar2 baz=fuz wiz". */
+/*parse_args("early options", cmdline, NULL, 0, 0, 0, NULL,do_early_param);
+  호출되는 인자들.
+*/
 char *parse_args(const char *doing,
 		 char *args,
 		 const struct kernel_param *params,
@@ -236,12 +239,18 @@ char *parse_args(const char *doing,
 		int irq_was_disabled;
 
 		args = next_arg(args, &param, &val);
+		//1, 토큰을 '='로 분리하여 param과 val로 담는다.
+		//2. space 문자로 토큰과 토큰 분리.
+		//3. 쌍따옴표가 사용된 경우 중가에 스페이스가 있어도 분류하지 않음.
 		/* Stop at -- */
 		if (!val && strcmp(param, "--") == 0)
-			return err ?: args;
+			return err ?: args;//val 값이 없으면서 param값이 "--"인 경우 더이상 파싱하지 않음.
 		irq_was_disabled = irqs_disabled();
+		//SCTLR의 인터럽트 마스크가 disable인지를 파악.
 		ret = parse_one(param, val, doing, params, num,
 				min_level, max_level, arg, unknown);
+		//위의 과정을 거쳐서 나온 param과 val을 이용하여 함수 호출
+		//본격적인 parsing이 이루어지는 곳.
 		if (irq_was_disabled && !irqs_disabled())
 			pr_warn("%s: option '%s' enabled irq's!\n",
 				doing, param);

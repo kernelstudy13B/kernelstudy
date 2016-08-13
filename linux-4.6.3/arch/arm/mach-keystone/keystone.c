@@ -70,7 +70,9 @@ static unsigned long keystone_virt_to_idmap(unsigned long x)
 
 static long long __init keystone_pv_fixup(void)
 {
-	long long offset;
+		//바뀌기 전의 name이 init_meminfo였음을 감안하면 결국 메모리정보를 초기화(early)하는 것이라고 생각하면 될듯.
+		//플랫폼이 다르기 떄문에 일반적인 루틴과 메모리 관리 방법이 다를 수 있음.
+		long long offset;
 	phys_addr_t mem_start, mem_end;
 
 	mem_start = memblock_start_of_DRAM();
@@ -112,5 +114,5 @@ DT_MACHINE_START(KEYSTONE, "Keystone")
 	.smp		= smp_ops(keystone_smp_ops),
 	.init_machine	= keystone_init,
 	.dt_compat	= keystone_match,
-	.pv_fixup	= keystone_pv_fixup,
+	.pv_fixup	= keystone_pv_fixup,//pv_fixup이라는 명칭이 keystone2와 연관이 있을것(추정)
 MACHINE_END
