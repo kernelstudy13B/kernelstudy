@@ -1568,14 +1568,15 @@ int __init_memblock memblock_search_pfn_nid(unsigned long pfn,
  */
 int __init_memblock memblock_is_region_memory(phys_addr_t base, phys_addr_t size)
 {
-	int idx = memblock_search(&memblock.memory, base);
-	phys_addr_t end = base + memblock_cap_size(base, &size);
+	//인자로 들어오는 base 사이즈가 이미 할당된 곳의 사이즈와 포함하는지 체크.
+	int idx = memblock_search(&memblock.memory, base);//region의 인덱스
+	phys_addr_t end = base + memblock_cap_size(base, &size);//할당 받으려는 주소를 표시
 
 	if (idx == -1)
 		return 0;
 	return memblock.memory.regions[idx].base <= base &&
 		(memblock.memory.regions[idx].base +
-		 memblock.memory.regions[idx].size) >= end;
+		 memblock.memory.regions[idx].size) >= end; //사이즈 포함여부를 리턴.
 }
 
 /**

@@ -177,7 +177,12 @@ static __init void reserve_regions(void)
 void __init efi_init(void)
 {
 	//부팅시 UEFI에 대한 초기화가 이루어지는 과정. UEFI에 사용될 메모리에 대한 초기화로 추정.
-	//efi : extensible firmware interface
+	/*efi : extensible firmware interface, U(unified)EFI로 발전.
+	운영체제와 플랫폼 펌웨어 사이의 소프트웨어 인터페이스를 정의하는 규격*/
+	
+	//bios에서 쓰이던 파티션 방식인 MBR대신 UEFI에서는 GPT 방식을 사용
+	//GPT - GUID partition table 
+	//MBR의 경우에는 하나의 디스크 파티션 크기가 2.2TB로 제한, GPT는 9.4ZB까지 허용.
 	struct efi_fdt_params params;
 
 	/* Grab UEFI information placed in FDT by stub */
@@ -194,6 +199,7 @@ void __init efi_init(void)
 		* description of memory we have, so there is little point in
 		* proceeding if we cannot access it.
 		*/
+		//->UEFI를 통해 부팅 할 경우 UEFI 메모리매핑은 오직 현재 가지고 있는 메모리만 나타내므로 그 메모리에 접근이 불가능하다면 진행이 불가.
 		panic("Unable to map EFI memory map.\n");
 	}
 	memmap.map_end = memmap.map + params.mmap_size;

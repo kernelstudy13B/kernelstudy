@@ -580,6 +580,7 @@ static int __init __fdt_scan_reserved_mem(unsigned long node, const char *uname,
  * defined in device tree structures. It should be called by arch specific code
  * once the early allocator (i.e. memblock) has been fully activated.
  */
+
 void __init early_init_fdt_scan_reserved_mem(void)
 {
 	int n;
@@ -603,6 +604,7 @@ void __init early_init_fdt_scan_reserved_mem(void)
 /**
  * early_init_fdt_reserve_self() - reserve the memory used by the FDT blob
  */
+//FDT 객체에 의해 사용될 메모리를 reserve.
 void __init early_init_fdt_reserve_self(void)
 {
 	if (!initial_boot_params)
@@ -612,6 +614,7 @@ void __init early_init_fdt_reserve_self(void)
 	early_init_dt_reserve_memory_arch(__pa(initial_boot_params),
 					  fdt_totalsize(initial_boot_params),
 					  0);
+	//boot_param에 들어있는 fdt(dtb)를 reserve.
 }
 
 /**

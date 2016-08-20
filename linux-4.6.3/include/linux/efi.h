@@ -715,7 +715,7 @@ struct efi_memory_map {
 struct efi_fdt_params {
 	u64 system_table;
 	u64 mmap;
-	u32 mmap_size;
+	u32 mmap_size; //efi를 쓰기 위한 메모리를 매핑시켜주기 위한 필드.
 	u32 desc_size;
 	u32 desc_ver;
 };

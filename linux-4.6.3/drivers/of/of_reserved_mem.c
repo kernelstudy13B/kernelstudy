@@ -248,10 +248,11 @@ static void __init __rmem_check_for_overlap(void)
 /**
  * fdt_init_reserved_mem - allocate and init all saved reserved memory regions
  */
+//저장된 reserved memory regions 모두를 할당하고 초기화.
 void __init fdt_init_reserved_mem(void)
 {
 	int i;
-
+	
 	/* check for overlapping reserved regions */
 	__rmem_check_for_overlap();
 

@@ -232,50 +232,64 @@ phys_addr_t __init arm_memblock_steal(phys_addr_t size, phys_addr_t align)
 
 void __init arm_memblock_init(const struct machine_desc *mdesc)
 {
+	//sanity~후 남은 memblock에 대해 커널영역, initrd 영역, 페이지테이블 등의 영역들을 등록.
 	/* Register the kernel text, kernel data and initrd with memblock. */
+	
+	//커널의 text영역과 data영역에 대해 memblock reserve 등록.
 #ifdef CONFIG_XIP_KERNEL
+		//XIP : flash 메모리에서만 적용, 코드영역을 제외한 나머지 커널 영역 등록, 즉 text를 배제.
 	memblock_reserve(__pa(_sdata), _end - _sdata);
 #else
 	memblock_reserve(__pa(_stext), _end - _stext);
 #endif
 #ifdef CONFIG_BLK_DEV_INITRD
 	/* FDT scan will populate initrd_start */
+	//initrd : init ram disk
+	//initrd start(ram디스크 시작주소)가 지정되있고 phys_initrd_size가 0이 아닐떄 start와 size를 지정.
 	if (initrd_start && !phys_initrd_size) {
 		phys_initrd_start = __virt_to_phys(initrd_start);
+		//initrd_start는 처음에 가상주소로 되어있음. memblock은 rowmem이므로 물리주소로 바꿔줌.
 		phys_initrd_size = initrd_end - initrd_start;
 	}
 	initrd_start = initrd_end = 0;
 	if (phys_initrd_size &&
-	    !memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
+	    !memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) 
+	//initrd 영역이 memory memblock 영역에 포함되어있지 않은 경우 initrd 영역을 memblock에 추가하는 것으 포기 하기윟 크기를 0으로 설정.
+	{
 		pr_err("INITRD: 0x%08llx+0x%08lx is not a memory region - disabling initrd\n",
 		       (u64)phys_initrd_start, phys_initrd_size);
 		phys_initrd_start = phys_initrd_size = 0;
 	}
 	if (phys_initrd_size &&
-	    memblock_is_region_reserved(phys_initrd_start, phys_initrd_size)) {
+	    memblock_is_region_reserved(phys_initrd_start, phys_initrd_size)) 
+	//initrd영역이 이미 reserved memblock 영역에 겹친 경우 initrd영역을 memblock에 추가하지 못다로고 크기를 0으로 설정.
+	{
 		pr_err("INITRD: 0x%08llx+0x%08lx overlaps in-use memory region - disabling initrd\n",
 		       (u64)phys_initrd_start, phys_initrd_size);
 		phys_initrd_start = phys_initrd_size = 0;
 	}
 	if (phys_initrd_size) {
-		memblock_reserve(phys_initrd_start, phys_initrd_size);
+		memblock_reserve(phys_initrd_start, phys_initrd_size);//initrd 영역을 reserve memblock에 추가.
 
 		/* Now convert initrd to virtual addresses */
+		//위 모든 작업이 끝나면 다시 가상주소로 변환.(highmem)
 		initrd_start = __phys_to_virt(phys_initrd_start);
 		initrd_end = initrd_start + phys_initrd_size;
 	}
 #endif
 
-	arm_mm_memblock_reserve();
+	arm_mm_memblock_reserve();//페이지 테이블을 reserve memblock에 추가.
 
 	/* reserve any platform specific memblock areas */
+	//아키텍처의 지정된 reserve함수를 호출.
 	if (mdesc->reserve)
-		mdesc->reserve();
+		mdesc->reserve();//rowmem이 필요할떄 메모리에 지정해주는 함수...
 
 	early_init_fdt_reserve_self();
-	early_init_fdt_scan_reserved_mem();
+	early_init_fdt_scan_reserved_mem();//DTB와 연관된 영역을 reserve memblock에 추가
 
 	/* reserve memory for DMA contiguous allocations */
+	//DMA 연속할당을 위한 memory reserve.
 	dma_contiguous_reserve(arm_dma_limit);
 
 	arm_memblock_steal_permitted = false;

@@ -104,6 +104,9 @@ static inline __maybe_unused phys_addr_t cma_early_percent_memory(void)
  * has been activated and all other subsystems have already allocated/reserved
  * memory.
  */
+
+/*연속 메모리를 할당, 제한은 reserved 메모리의 끝 주소
+  이전 allocator로부터 메모리를 reserve 하는 함수인데 이전의 allocator가 활성화되고 기타 모든 subsystem들이 메모리를 할당하거나 reserve하면 architecture의 특정 코드에 의해 호출되어야 한다.*/
 void __init dma_contiguous_reserve(phys_addr_t limit)
 {
 	phys_addr_t selected_size = 0;

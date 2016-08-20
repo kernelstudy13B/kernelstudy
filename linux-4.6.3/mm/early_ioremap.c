@@ -79,7 +79,7 @@ void __init early_ioremap_setup(void)
 
   fixmap : fix maped linear address space
   		   커널이 부팅 전 초기화과정에서 이용할 메모리를 할당받을 수 있는 영역.
-  		   아주 극히 짧은 시간 동안 매ㅣㅇ하여 사용가능, fixmap address space에 매핑을 한다.
+  		   아주 극히 짧은 시간 동안 매칭하여 사용가능, fixmap address space에 매핑을 한다.
 		   */
 {
 	int i;

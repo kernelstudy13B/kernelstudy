@@ -1167,27 +1167,36 @@ early_param("vmalloc", early_vmalloc);
 phys_addr_t arm_lowmem_limit __initdata = 0;
 
 void __init sanity_check_meminfo(void)
+		/*1, lowmem 영역만 사용해야 하는 case에 대해 memblock 영역 삭제
+		  2. arm_lowmem_limit 및 highmemory 설정.
+		  3. memblock.current_limit 설정*/
+
+		//memory memblock에 대해 미리 사전체크, early memory allocator로 동작할수있도록 함.
+		//memblock : 기본적인 메모리관리자, buddy와 slab과 같은 memory allocator로 전환하기 전 부트 타임에만 동작.
 {
 	phys_addr_t memblock_limit = 0;
 	int highmem = 0;
 	phys_addr_t vmalloc_limit = __pa(vmalloc_min - 1) + 1;
+	//vmalloc의 물리주소가 할당된다.
 	struct memblock_region *reg;
 	bool should_use_highmem = false;
 
-	for_each_memblock(memory, reg) {
+	for_each_memblock(memory, reg) { //등록된 memblock은 커널 설정 초기에 2M 단위를 메모리르 할당받아 사용.
 		phys_addr_t block_start = reg->base;
 		phys_addr_t block_end = reg->base + reg->size;
 		phys_addr_t size_limit = reg->size;
+		//memblock의 크기 설정...(2MB?)
 
 		if (reg->base >= vmalloc_limit)
+		//영역의 시작무리주소가 vmalloc_init 초과시 highmem영역이라 판단.
 			highmem = 1;
 		else
 			size_limit = vmalloc_limit - reg->base;
 
 
 		if (!IS_ENABLED(CONFIG_HIGHMEM) || cache_is_vipt_aliasing()) {
-
-			if (highmem) {
+		//highmeme 설정이 안되잇거나 d-cache가 vipt aliasing을 사용하는 경우.
+			if (highmem) {//highmem 영역을 사용하는 블록 삭제.
 				pr_notice("Ignoring RAM at %pa-%pa (!CONFIG_HIGHMEM)\n",
 					  &block_start, &block_end);
 				memblock_remove(reg->base, reg->size);
@@ -1206,7 +1215,7 @@ void __init sanity_check_meminfo(void)
 			}
 		}
 
-		if (!highmem) {
+		if (!highmem) {//highmem이 없으므로 그에 따른 limit 설정을 다시 하는 부분.
 			if (block_end > arm_lowmem_limit) {
 				if (reg->size > size_limit)
 					arm_lowmem_limit = vmalloc_limit;
@@ -1247,12 +1256,13 @@ void __init sanity_check_meminfo(void)
 	 * helps to ensure that we will allocate memory from the
 	 * last full pmd, which should be mapped.
 	 */
-	if (memblock_limit)
+	if (memblock_limit)//memblock은 설정 초기에 2MB단위로 할당 받으므로 align되지 않은 메모리가 배열에 등록되어 있다면 align된 영역까지만 사용, 나머지는 memblock_limit을 설정.
 		memblock_limit = round_down(memblock_limit, PMD_SIZE);
 	if (!memblock_limit)
 		memblock_limit = arm_lowmem_limit;
 
 	memblock_set_current_limit(memblock_limit);
+	//전 과정을 거친 limit을 current limit으로 설정
 }
 
 static inline void prepare_page_table(void)
@@ -1307,6 +1317,7 @@ void __init arm_mm_memblock_reserve(void)
 	 * and can only be in node 0.
 	 */
 	memblock_reserve(__pa(swapper_pg_dir), SWAPPER_PG_DIR_SIZE);
+	//swapper_pg_dir이 pgd의 첫 주소
 
 #ifdef CONFIG_SA1111
 	/*

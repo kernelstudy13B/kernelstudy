@@ -1115,13 +1115,13 @@ gpio : general purpose.
 	//LPAE와 관련이 있는 경우와 아닌경우로 나누어 메모리 정보에 대한 초기화를 하는 함수. 페이징에 대한 정보를 초기화하는 것이 아닌 페이징과 연관이 있을 메모리의 정보를 초기화.
 #endif
 	setup_dma_zone(mdesc);
-	efi_init();
-	sanity_check_meminfo();
+	efi_init(); //efi 또는 uefi에 대한 메모리, descriptor 등 설정.
+	sanity_check_meminfo();//highmem과 lowmem의 memblock 유효성 검사.
 	arm_memblock_init(mdesc);
 
 	early_ioremap_reset();
 
-	paging_init(mdesc);
+	paging_init(mdesc);//메모리 페이징 준비.
 	request_standard_resources(mdesc);
 
 	if (mdesc->restart)

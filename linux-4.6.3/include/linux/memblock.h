@@ -41,7 +41,7 @@ struct memblock_type {
 	unsigned long cnt;	/* number of regions */
 	unsigned long max;	/* size of the allocated array */
 	phys_addr_t total_size;	/* size of all regions */
-	struct memblock_region *regions;
+	struct memblock_region *regions; //각 타입에 대한 region을 가르킬 필드.
 };
 
 struct memblock {
@@ -343,7 +343,7 @@ extern void __memblock_dump_all(void);
 
 static inline void memblock_dump_all(void)
 {
-	if (memblock_debug)
+	if (memblock_debug) //디버깅 모드가 활성화되있을때.
 		__memblock_dump_all();
 }
 
