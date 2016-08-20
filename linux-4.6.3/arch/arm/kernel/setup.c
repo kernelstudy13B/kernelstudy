@@ -272,7 +272,9 @@ static int __get_cpu_architecture(void) //arm의 어떠한 architecture인지에
 }
 #endif
 
-int __pure cpu_architecture(void)
+int __pure cpu_architecture(void) 
+	// 같은 인수로 호출하면 항상 같은 값을 반환하는데 전역 변수에 대해서는 읽기만 수행하겠다.
+	// __pure : 한번 호출 되면 나중에 호출 되면 함수 수행이 안되고 그전에 호출될때 리턴됬던값을 그대로 리턴, 전역 변수 사용할 때는 조심해야함
 {
 	BUG_ON(__cpu_architecture == CPU_ARCH_UNKNOWN);
 

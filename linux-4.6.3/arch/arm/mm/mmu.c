@@ -446,11 +446,19 @@ static void __init build_mem_type_table(void)
 	unsigned int cr = get_cr();
 	pteval_t user_pgprot, kern_pgprot, vecs_pgprot;
 	pteval_t hyp_device_pgprot, s2_pgprot, s2_device_pgprot;
+	// prot : ?
 	int cpu_arch = cpu_architecture();
 	int i;
+	/*
+0 0 : noncached nonbuffered
+	DCache disabled. Read from external memory. Write as a nonbuffered store(s) to external memory. DCache is updated.
 
+0 1 : noncached buffered
+	DCache disabled. Read from external memory. Write as a buffered store(s) to external memory. DCache is not updated.
+	*/
 	if (cpu_arch < CPU_ARCH_ARMv6) {
-#if defined(CONFIG_CPU_DCACHE_DISABLE)
+#if defined(CONFIG_CPU_DCACHE_DISABLE) // DCACHE에 대한 write를 안하고 버퍼에다가 하겠다.?
+		//cpu <-> dcache(이건 off) <-> (buffer(mem chip에 포함) <-> memory) 
 		if (cachepolicy > CPOLICY_BUFFERED)
 			cachepolicy = CPOLICY_BUFFERED;
 #elif defined(CONFIG_CPU_DCACHE_WRITETHROUGH)
@@ -463,7 +471,11 @@ static void __init build_mem_type_table(void)
 			cachepolicy = CPOLICY_WRITEBACK;
 		ecc_mask = 0;
 	}
-
+	/*
+	 * write allocate : write 할 때, miss 나면 캐시 라인 할당
+	 * no-write allocate(read allocate) : write 할 때, 캐시 안쓰고 바로 메모리로 쏘겠다.
+	 * smp면 write allocate 랑 page table 공유 하겠다.
+	 */
 	if (is_smp()) {
 		if (cachepolicy != CPOLICY_WRITEALLOC) {
 			pr_warn("Forcing write-allocate cache policy for SMP\n");
@@ -474,7 +486,11 @@ static void __init build_mem_type_table(void)
 			initial_pmd_value |= PMD_SECT_S;
 		}
 	}
-
+	// cachepolicy는 이 아키텍처에서 사용 가능한 정책들이고
+	// 만약에 cachepolicy가 CPOLICY_WRITEALLOC 이면 그 이하의 정책들도 사용가능
+	// 아래는 이제 메모리를 메모리 타입별로 구분하고 그 타입별로
+	// 각각에 맞는 정책을 설정
+	//////////////////////////////////////////////////// 	
 	/*
 	 * Strip out features not present on earlier architectures.
 	 * Pre-ARMv5 CPUs don't have TEX bits.  Pre-ARMv6 CPUs or those
@@ -482,7 +498,7 @@ static void __init build_mem_type_table(void)
 	 */
 	if (cpu_arch < CPU_ARCH_ARMv5)
 		for (i = 0; i < ARRAY_SIZE(mem_types); i++)
-			mem_types[i].prot_sect &= ~PMD_SECT_TEX(7);
+			mem_types[i].prot_sect &= ~PMD_SECT_TEX(7); //TEX : Type EXtension
 	if ((cpu_arch < CPU_ARCH_ARMv6 || !(cr & CR_XP)) && !cpu_is_xsc3())
 		for (i = 0; i < ARRAY_SIZE(mem_types); i++)
 			mem_types[i].prot_sect &= ~PMD_SECT_S;
@@ -569,6 +585,7 @@ static void __init build_mem_type_table(void)
 	 */
 	cp = &cache_policies[cachepolicy];
 	vecs_pgprot = kern_pgprot = user_pgprot = cp->pte;
+	//vecs_pgprot : interrupt_vector에 해당하는 페이지 속성
 	s2_pgprot = cp->pte_s2;
 	hyp_device_pgprot = mem_types[MT_DEVICE].prot_pte;
 	s2_device_pgprot = mem_types[MT_DEVICE].prot_pte_s2;
@@ -595,7 +612,7 @@ static void __init build_mem_type_table(void)
 	/*
 	 * ARMv6 and above have extended page tables.
 	 */
-	if (cpu_arch >= CPU_ARCH_ARMv6 && (cr & CR_XP)) {
+	if (cpu_arch >= CPU_ARCH_ARMv6 && (cr & CR_XP)) { // ARMv6 이상이고 smp 면 SHARE 하겠다. 
 #ifndef CONFIG_ARM_LPAE
 		/*
 		 * Mark cache clean areas and XIP ROM read only
@@ -611,7 +628,7 @@ static void __init build_mem_type_table(void)
 		 * set, then we need to do the same here for the same
 		 * reasons given in early_cachepolicy().
 		 */
-		if (initial_pmd_value & PMD_SECT_S) {
+		if (initial_pmd_value & PMD_SECT_S) { // initial_pmd_value 위에서 설정했음
 			user_pgprot |= L_PTE_SHARED;
 			kern_pgprot |= L_PTE_SHARED;
 			vecs_pgprot |= L_PTE_SHARED;
@@ -1665,7 +1682,10 @@ void __init paging_init(const struct machine_desc *mdesc)
 {
 	void *zero_page;
 
-	build_mem_type_table();
+	build_mem_type_table(); // mem_types table을 구성, mem_types 테이블은 메모리 타입에 대한 엔트리들로 구성되며, 각 엔트리는 아키텍처를 검사해 해당 아키텍처에 필요없는 비트는 0으로 필요한 비트는 1로 설정
+	// 이 함수에서는 각 아키텍처에 맞게 mem_type_table 을 구성하고, 나중에 선택하겠지?
+	// devicemaps_init(mdesc) 여기서 전체 메모리 영역을 여러개로 나누고 
+	// 각 영역에 맞는 mem_type (정책)을 설정해준다. (ㅜㅜ)
 	prepare_page_table();
 	map_lowmem();
 	memblock_set_current_limit(arm_lowmem_limit);
