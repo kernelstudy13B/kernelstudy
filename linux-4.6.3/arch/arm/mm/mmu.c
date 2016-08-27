@@ -256,19 +256,26 @@ __setup("noalign", noalign_setup);
 static struct mem_type mem_types[] = {
 	[MT_DEVICE] = {		  /* Strongly ordered / ARMv6 shared device */
 		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_SHARED |
-				  L_PTE_SHARED,
+				  L_PTE_SHARED,//2차 변환 수행시 사용하는 2차페이지테이블의 descriptor 엔트리 속성.
 		.prot_pte_s2	= s2_policy(PROT_PTE_S2_DEVICE) |
 				  s2_policy(L_PTE_S2_MT_DEV_SHARED) |
 				  L_PTE_SHARED,
+		//하이퍼바이저에서 prot_pte대신 사용
 		.prot_l1	= PMD_TYPE_TABLE,
+		//2차 변환 수행시 사용하는 1차 페이지 테이블  descriptor 엔트리 속성
 		.prot_sect	= PROT_SECT_DEVICE | PMD_SECT_S,
+		//1차 변환 수행시 사용하는 섹션 페이지 descriptor 엔트리 속성.
 		.domain		= DOMAIN_IO,
+		//domain : 해당 페이지를 통제하는 주체.
+
+		//shared : 여러 프로세서들 사이에서 공유되는 메모리들을 다룰수 있음.
 	},
 	[MT_DEVICE_NONSHARED] = { /* ARMv6 non-shared device */
 		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_NONSHARED,
 		.prot_l1	= PMD_TYPE_TABLE,
 		.prot_sect	= PROT_SECT_DEVICE,
 		.domain		= DOMAIN_IO,
+		//Non-shared : 하나의 프로세서에 의해 사용되는 메모리를 다룰 수 있음.
 	},
 	[MT_DEVICE_CACHED] = {	  /* ioremap_cached */
 		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_CACHED,
@@ -442,12 +449,12 @@ void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot)
  */
 static void __init build_mem_type_table(void)
 {
-	struct cachepolicy *cp;
+	struct cachepolicy *cp; //각 아키텍처가 지원하는 캐시정책이 담긴다.
 	unsigned int cr = get_cr();
 	pteval_t user_pgprot, kern_pgprot, vecs_pgprot;
 	pteval_t hyp_device_pgprot, s2_pgprot, s2_device_pgprot;
 	// prot : ?
-	int cpu_arch = cpu_architecture();
+	int cpu_arch = cpu_architecture();//현재 머신의 아키텍처를 알아내는 함수
 	int i;
 	/*
 0 0 : noncached nonbuffered
@@ -936,10 +943,11 @@ static void __init __create_mapping(struct mm_struct *mm, struct map_desc *md,
 				    void *(*alloc)(unsigned long sz),
 				    bool ng)
 {
+		
 	unsigned long addr, length, end;
 	phys_addr_t phys;
 	const struct mem_type *type;
-	pgd_t *pgd;
+	pgd_t *pgd;//초기화 되어 있는 pgd
 
 	type = &mem_types[md->type];
 
@@ -963,7 +971,7 @@ static void __init __create_mapping(struct mm_struct *mm, struct map_desc *md,
 		return;
 	}
 
-	pgd = pgd_offset(mm, addr);
+	pgd = pgd_offset(mm, addr);//pgd의 기본주소 할당.
 	end = addr + length;
 	do {
 		unsigned long next = pgd_addr_end(addr, end);
@@ -973,6 +981,8 @@ static void __init __create_mapping(struct mm_struct *mm, struct map_desc *md,
 		phys += next - addr;
 		addr = next;
 	} while (pgd++, addr != end);
+	//기본주소를 pgd에 할당후, memblock의 end까지 반복함 - 매핑의 과정
+
 }
 
 /*
@@ -1284,25 +1294,35 @@ void __init sanity_check_meminfo(void)
 
 static inline void prepare_page_table(void)
 {
+	//커널 이미지 아래쪽에 해당하는 페이지 디레토리의 각 엔트리에 대해 pmd 섹션을 0으로 클리어
+	//커널 공간에 해당하는 페이지 디렉토리의 각 엔트리에 대해서 pmd 섹션을 0으로 클리어.
+	/*
+	1.0x0 ~ 모듈영역 전까지
+	2.모듈영역 ~ PAGE_OFFSET 영역(커널이미지의 가상주소)
+	3.lowmem 남은 공간 부터 VMALLOC_START 영역전
+	->각 영역들을 1차 페이지 테이블에서 초기화
+	   */
 	unsigned long addr;
 	phys_addr_t end;
 
 	/*
 	 * Clear out all the mappings below the kernel image.
 	 */
-	for (addr = 0; addr < MODULES_VADDR; addr += PMD_SIZE)
+	for (addr = 0; addr < MODULES_VADDR; addr += PMD_SIZE)//2mb 단위의 엔트리
 		pmd_clear(pmd_off_k(addr));
 
 #ifdef CONFIG_XIP_KERNEL
 	/* The XIP kernel is mapped in the module area -- skip over it */
+	//XIP커널은 모듈내에서 동작하므로 디렉토리 엔트리 초기화 과정 생략
 	addr = ((unsigned long)_exiprom + PMD_SIZE - 1) & PMD_MASK;
 #endif
-	for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)
+	for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)//계속해서 PAGE_OFFSET까지 클리어.
 		pmd_clear(pmd_off_k(addr));
 
 	/*
 	 * Find the end of the first block of lowmem.
 	 */
+	//end : 물리메모리의 끝주소
 	end = memblock.memory.regions[0].base + memblock.memory.regions[0].size;
 	if (end >= arm_lowmem_limit)
 		end = arm_lowmem_limit;
@@ -1468,18 +1488,22 @@ static void __init kmap_init(void)
 
 static void __init map_lowmem(void)
 {
+	//lowmem 영역을 페이지 테이블에 매핑.
+	//각 영역에 따라 MT_MEMORY_RW, MT_MEMORY_RWX 타입으로 매핑.
 	struct memblock_region *reg;
+	//커널의 시작과 끝을 구함- 메모리상의 커널공간은 lowmem에 위치.
 #ifdef CONFIG_XIP_KERNEL
 	phys_addr_t kernel_x_start = round_down(__pa(_sdata), SECTION_SIZE);
 #else
 	phys_addr_t kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
 #endif
 	phys_addr_t kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
+	//커널 코드영역 끝, .data 섹션 안에 위치한 init data 종료 주소.
 
 	/* Map all the lowmem memory banks. */
 	for_each_memblock(memory, reg) {
 		phys_addr_t start = reg->base;
-		phys_addr_t end = start + reg->size;
+		phys_addr_t end = start + reg->size;//memblock의 시작과 끝 지정.
 		struct map_desc map;
 
 		if (memblock_is_nomap(reg))
@@ -1495,6 +1519,7 @@ static void __init map_lowmem(void)
 			map.virtual = __phys_to_virt(start);
 			map.length = end - start;
 			map.type = MT_MEMORY_RWX;
+			//memblock이 커널보다 아래에 있다면 이 memblock을 MT_MEMORY_RWX타입으로 매핑.
 
 			create_mapping(&map);
 		} else if (start >= kernel_x_end) {
@@ -1507,7 +1532,7 @@ static void __init map_lowmem(void)
 		} else {
 			/* This better cover the entire kernel */
 			if (start < kernel_x_start) {
-				map.pfn = __phys_to_pfn(start);
+				map.pfn = __phys_to_pfn(start);//pfn : page frame number
 				map.virtual = __phys_to_virt(start);
 				map.length = kernel_x_start - start;
 				map.type = MT_MEMORY_RW;
