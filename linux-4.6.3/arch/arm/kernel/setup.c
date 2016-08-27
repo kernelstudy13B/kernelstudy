@@ -1108,7 +1108,7 @@ gpio : general purpose.
 	//setup_arch 함수의 매개변수에 cmd_line을 변경
 
 	early_fixmap_init(); // fixmap 영역 초기화
-	early_ioremap_init();
+	early_ioremap_init(); // bm_pte (bitmap_pte ?????, device 매핑되 사용될 메모리를 위해 pte table????) 
 
 	parse_early_param(); //tmp 커맨드라인으로 들어가는 command를 나뉘어지는 토큰에 따라 setup_func함수를 호출.
 

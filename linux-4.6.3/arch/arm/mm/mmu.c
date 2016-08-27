@@ -961,7 +961,14 @@ static void __init __create_mapping(struct mm_struct *mm, struct map_desc *md,
 	}
 #endif
 
-	addr = md->virtual & PAGE_MASK;
+	addr = md->virtual & PAGE_MASK; // pgd 찾을 거니까 뒤쪽 비트 주소 필요없음
+	/*
+	 * #define PAGE_MASK       (~((1 << PAGE_SHIFT) - 1))
+	 *
+	 * 00000000 00000000 00001000 00000000  (1 << 12)
+	 * 00000000 00000000 00000111 11111111  (-1)
+	 * 11111111 11111111 11111000 00000000  (~)
+	 */
 	phys = __pfn_to_phys(md->pfn);
 	length = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
 
@@ -1035,7 +1042,11 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
 		return;
 
 	svm = early_alloc_aligned(sizeof(*svm) * nr, __alignof__(*svm));
-
+	// nr 개 만큼 svm 할당
+	// svm 안에 vm 하나 인듯	
+	// svm 은 svm 들끼리 연결된 list를 구성
+	// vm 은 vm 들끼리 연결된 list를 구성
+	
 	for (md = io_desc; nr; md++, nr--) {
 		create_mapping(md);
 
@@ -1046,7 +1057,7 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
 		vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
 		vm->flags |= VM_ARM_MTYPE(md->type);
 		vm->caller = iotable_init;
-		add_static_vm_early(svm++);
+		add_static_vm_early(svm++); // svm list에 만든 svm을 넣음
 	}
 }
 
@@ -1514,9 +1525,26 @@ static void __init map_lowmem(void)
 		if (start >= end)
 			break;
 
+		/*
+		 * 해당 memblock 이 어느 위치에 위치하느냐에 따라 type 지정
+		 * memblock 이 커널 아래일 때 MT_MEMORY_RWX로 지정
+		 * memblock 이 커널 위에 있을 때 MT_MEMORY_RW
+		 * memblock 이 커널에 포함된 경우
+		 * 	1. memblock 이 커널의 아래 부분과 겹침 MT_MEMORY_RW
+		 * 	2. memblock 이 커널에 포함 MT_MEMORY_RWX
+		 * 	3. memblock 이 커널의 위 부분과 겹침 MT_MEMORY_RW
+		 *
+		 */
+
 		if (end < kernel_x_start) {
 			map.pfn = __phys_to_pfn(start);
-			map.virtual = __phys_to_virt(start);
+			map.virtual = __phys_to_virt(start); 
+			// Embedded ARM memory user/kernel 2:2
+			/* __phys_to_virt : pv_table 을 쓰는 경우 안쓰는 경우가 있고
+			 * 커널 메모리를 얼마나 쓰느냐에 따라서 -,+ 하는 크기가 달라짐
+			 * 1:3, 2:2, 3:1 다 가능
+			 * XIP, nommu 일땐 PHYS_OFFSET 이 달라짐 일반적인 경우 0이라고 봄
+			 */
 			map.length = end - start;
 			map.type = MT_MEMORY_RWX;
 			//memblock이 커널보다 아래에 있다면 이 memblock을 MT_MEMORY_RWX타입으로 매핑.
@@ -1678,12 +1706,14 @@ static void __init early_fixmap_shutdown(void)
 	pte_offset_fixmap = pte_offset_late_fixmap;
 	pmd_clear(fixmap_pmd(va));
 	local_flush_tlb_kernel_page(va);
+	
 
 	for (i = 0; i < __end_of_permanent_fixed_addresses; i++) {
 		pte_t *pte;
 		struct map_desc map;
 
 		map.virtual = fix_to_virt(i);
+		// i 번째 slot 의 가상 주소 가져옴
 		pte = pte_offset_early_fixmap(pmd_off_k(map.virtual), map.virtual);
 
 		/* Only i/o device mappings are supported ATM */
@@ -1715,6 +1745,12 @@ void __init paging_init(const struct machine_desc *mdesc)
 	map_lowmem();
 	memblock_set_current_limit(arm_lowmem_limit);
 	dma_contiguous_remap();
+	/*
+	 * portmapped IO : 이건 CPU 가 port 랑 통신 (iomapped IO 라고도 함)
+	 * memorymapped IO : CPU가 직접 보내는거임 하나하나를 주소에 쓸때마다 memory 주소 자체를 이용해서(약속된 주소) 통신 (mmap?) (이건 공유가아니라 직접 써넣는거임)
+	 * DMA : 이건 Device 가 memory랑 통신하는거임 (CPU 와 Device 가 메모리를 공유하고 있지)
+	 * ioremap : 요즘엔 디바이스들이 직접 매핑이 되어 있는데, MMU 가 있는 시스템에서는 물리 주소를 써먹으면 안되고 가상주소를 이용해야 하니까 물리 주소에서 가상 주소로 remap 을 해야 한다. 그게 ioremap
+	 */
 	early_fixmap_shutdown();
 	devicemaps_init(mdesc);
 	kmap_init();

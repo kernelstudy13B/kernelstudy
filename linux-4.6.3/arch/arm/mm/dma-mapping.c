@@ -463,6 +463,11 @@ void __init dma_contiguous_early_fixup(phys_addr_t base, unsigned long size)
 void __init dma_contiguous_remap(void)
 {
 	int i;
+	/*
+	 * dma_mmu_reamp[] DMA 영역이 등록되어 있음
+	 * device driver 가 사용하는 DMA 영역을 CMA(contiguous memory allocator)에 등록
+	 * 하고 사용
+	 */
 	for (i = 0; i < dma_mmu_remap_num; i++) {
 		phys_addr_t start = dma_mmu_remap[i].base;
 		phys_addr_t end = start + dma_mmu_remap[i].size;
@@ -496,6 +501,7 @@ void __init dma_contiguous_remap(void)
 				       __phys_to_virt(end));
 
 		iotable_init(&map, 1);
+		// iotable 을 위한 svm, vm 구조체에 iotable에 맞는 플래그들 넣어서 할당 받음
 	}
 }
 

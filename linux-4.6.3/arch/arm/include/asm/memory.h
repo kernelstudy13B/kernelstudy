@@ -166,7 +166,7 @@
 #define virt_to_pfn(kaddr) (__pa(kaddr) >> PAGE_SHIFT)
 
 #elif defined(CONFIG_ARM_PATCH_PHYS_VIRT)
-
+// pv_table을 쓰는 경우의 시작
 /*
  * Constants used to force the right instruction encodings and shifts
  * so that all we need to do is modify the 8-bit constant field.
@@ -185,7 +185,10 @@ extern const void *__pv_table_begin, *__pv_table_end;
 #define virt_to_pfn(kaddr) \
 	((((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT) + \
 	 PHYS_PFN_OFFSET)
-
+/*
+ * from(phys) - I (0x81000000)
+ *
+ */
 #define __pv_stub(from,to,instr,type)			\
 	__asm__("@ __pv_stub\n"				\
 	"1:	" instr "	%0, %1, %2\n"		\
@@ -238,10 +241,10 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
 	 * assembler expression receives 32 bit argument
 	 * in place where 'r' 32 bit operand is expected.
 	 */
-	__pv_stub((unsigned long) x, t, "sub", __PV_BITS_31_24);
+	__pv_stub((unsigned long) x, t, "sub", __PV_BITS_31_24); //__PV_BIT_31_24 약 2gb 
 	return t;
 }
-
+// pv_table 쓰는 경우의 끝
 #else
 
 #define PHYS_OFFSET	PLAT_PHYS_OFFSET

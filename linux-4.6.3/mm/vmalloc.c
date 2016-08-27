@@ -1157,6 +1157,10 @@ void __init vm_area_add_early(struct vm_struct *vm)
 	struct vm_struct *tmp, **p;
 
 	BUG_ON(vmap_initialized);
+	/*
+	 * vmlist 안에서
+	 * 자기 자리 (순서대로) 찾아서 vmlist안으로 들어감
+	 */
 	for (p = &vmlist; (tmp = *p) != NULL; p = &tmp->next) {
 		if (tmp->addr >= vm->addr) {
 			BUG_ON(tmp->addr < vm->addr + vm->size);

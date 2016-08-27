@@ -92,9 +92,9 @@ void __init add_static_vm_early(struct static_vm *svm)
 	void *vaddr;
 
 	vm = &svm->vm;
-	vm_area_add_early(vm);
+	vm_area_add_early(vm); // vm 들끼리 연결
 	vaddr = vm->addr;
-
+	
 	list_for_each_entry(curr_svm, &static_vmlist, list) {
 		vm = &curr_svm->vm;
 
