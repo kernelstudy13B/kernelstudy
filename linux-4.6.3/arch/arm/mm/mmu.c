@@ -1383,6 +1383,7 @@ void __init arm_mm_memblock_reserve(void)
  * Any other function or debugging method which may touch any device _will_
  * crash the kernel.
  */
+// vector table 을 올려놓을 메모리를 할당, 매핑
 static void __init devicemaps_init(const struct machine_desc *mdesc)
 {
 	struct map_desc map;
@@ -1392,8 +1393,8 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 	/*
 	 * Allocate the vector page early.
 	 */
-	vectors = early_alloc(PAGE_SIZE * 2);
-
+	vectors = early_alloc(PAGE_SIZE * 2); // page 2개를 벡터 테이블을 위해 할당 받음
+	
 	early_trap_init(vectors);
 
 	/*
@@ -1698,16 +1699,18 @@ void __init early_paging_init(const struct machine_desc *mdesc)
 
 #endif
 
+// fixmap 영역에 대한 현재 매핑되어 있는 페이지 테이블 정보를 클리어 재매핑
 static void __init early_fixmap_shutdown(void)
 {
 	int i;
 	unsigned long va = fix_to_virt(__end_of_permanent_fixed_addresses - 1);
+	// fixmap 영역의 virtual address 가져옴
 
 	pte_offset_fixmap = pte_offset_late_fixmap;
 	pmd_clear(fixmap_pmd(va));
 	local_flush_tlb_kernel_page(va);
 	
-
+    // clear 한 페이지 테이블을 재매핑
 	for (i = 0; i < __end_of_permanent_fixed_addresses; i++) {
 		pte_t *pte;
 		struct map_desc map;
@@ -1722,10 +1725,11 @@ static void __init early_fixmap_shutdown(void)
 			continue;
 
 		map.pfn = pte_pfn(*pte);
-		map.type = MT_DEVICE;
+		map.type = MT_DEVICE; // fixmap 영역의 type은 항상 MT_DEVICE 를 갖는거같음?? type의 default??  
 		map.length = PAGE_SIZE;
 
 		create_mapping(&map);
+		// fixmap mapping
 	}
 }
 

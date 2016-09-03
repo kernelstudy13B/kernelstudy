@@ -768,19 +768,24 @@ void __init trap_init(void)
 }
 
 #ifdef CONFIG_KUSER_HELPERS
+// kuser helper code 삽입
+// kuser helper : ARM interrupt 에서 제공안되는 기능을 유저가 구현해서 삽입 가능하게 
+// 해주는 기능?? 사용자 정의 가능한 interrupt code ?? 공간 확보
+// + tls emu을 하려거나 tls 관련 reg가 있는경우 관련 설정
 static void __init kuser_init(void *vectors)
 {
 	extern char __kuser_helper_start[], __kuser_helper_end[];
 	int kuser_sz = __kuser_helper_end - __kuser_helper_start;
 
 	memcpy(vectors + 0x1000 - kuser_sz, __kuser_helper_start, kuser_sz);
-
+	// 두번째 할당 받은 페이지 바로 아래에 kuser_helper 코드를 복사
 	/*
 	 * vectors + 0xfe0 = __kuser_get_tls
 	 * vectors + 0xfe8 = hardware TLS instruction at 0xffff0fe8
 	 */
-	if (tls_emu || has_tls_reg)
+	if (tls_emu || has_tls_reg) // tls emulation ? or tls reg 갖고있음? 
 		memcpy(vectors + 0xfe0, vectors + 0xfe8, 4);
+	// user 에게 tls 기능 제공하기 위해
 }
 #else
 static inline void __init kuser_init(void *vectors)
@@ -788,6 +793,7 @@ static inline void __init kuser_init(void *vectors)
 }
 #endif
 
+// vector table 관련 설정(vector, stub, kuser code ...)
 void __init early_trap_init(void *vectors_base)
 {
 #ifndef CONFIG_CPU_V7M
@@ -806,6 +812,9 @@ void __init early_trap_init(void *vectors_base)
 	 */
 	for (i = 0; i < PAGE_SIZE / sizeof(u32); i++)
 		((u32 *)vectors_base)[i] = 0xe7fddef1;
+	// PAGE 하나에 exception 발생 주소?? 를 할당해놓고
+	// 아래에서 벡터 테이블을 복사해온뒤 없는 인터럽트의 경우
+	// exception을 발생시킴  
 
 	/*
 	 * Copy the vectors, stubs and kuser helpers (in entry-armv.S)
@@ -813,11 +822,15 @@ void __init early_trap_init(void *vectors_base)
 	 * are visible to the instruction stream.
 	 */
 	memcpy((void *)vectors, __vectors_start, __vectors_end - __vectors_start);
+	// PAGE 하나에 벡터 테이블 복사
 	memcpy((void *)vectors + 0x1000, __stubs_start, __stubs_end - __stubs_start);
+	// stub : vector handler 가 들어있고 코드 길이가 길어서 담을 수 없는 경우 
+	// 다시 forwarding
 
 	kuser_init(vectors_base);
 
 	flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
+	// icache flush
 #else /* ifndef CONFIG_CPU_V7M */
 	/*
 	 * on V7-M there is no need to copy the vector table to a dedicated
