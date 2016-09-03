@@ -1398,7 +1398,9 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 	early_trap_init(vectors);
 
 	/*
-	 * Clear page table except top pmd used by early fixmaps
+	 * Clear page table except top pmd used by early fixmaps (early fixmap 에 의해 사용되는
+	 * top pmd 를 제외하고 초기화
+	 * VMALLOC_START ~~ VMALLOC_END  ~~ FIXADDR_START ~~ FIXADDR_TOP - PAGE_SIZE(4K)  ~~ FIXADDR_END PMD CLEAR
 	 */
 	for (addr = VMALLOC_START; addr < (FIXADDR_TOP & PMD_MASK); addr += PMD_SIZE)
 		pmd_clear(pmd_off_k(addr));
@@ -1406,6 +1408,8 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 	/*
 	 * Map the kernel if it is XIP.
 	 * It is always first in the modulearea.
+	 * MODULES_VADDR 이 주소에 XIP 커널이 매핑
+	 * XIP 커널이 존재하고 있는 플래시 메모리의 물리 주소를 갖을테니 그걸 매핑 
 	 */
 #ifdef CONFIG_XIP_KERNEL
 	map.pfn = __phys_to_pfn(CONFIG_XIP_PHYS_ADDR & SECTION_MASK);
@@ -1417,15 +1421,19 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 
 	/*
 	 * Map the cache flushing regions.
+	 * cache flushing region : cache 에서 메모리로 플러시될 데이터를
+	 * 임시로 담아두는 메모리의 영역?? 
+	 * cache flush : invalidate 라고 부르기도 하며, cache 를 비워버림 (동기화 x)
+	 * cache clean : memory 와 동기화 시키고 비워버림
 	 */
-#ifdef FLUSH_BASE
+#ifdef FLUSH_BASE // 이 영역은 캐시 되지 않으며 메모리 write 버퍼를 이용하고 플러시된 데이터를 임시로 보관
 	map.pfn = __phys_to_pfn(FLUSH_BASE_PHYS);
 	map.virtual = FLUSH_BASE;
 	map.length = SZ_1M;
 	map.type = MT_CACHECLEAN;
 	create_mapping(&map);
 #endif
-#ifdef FLUSH_BASE_MINICACHE
+#ifdef FLUSH_BASE_MINICACHE // 이 영역은 캐시 되지 않고 메모리 write 버퍼를 이용하지 않고 플러시 된 데이터를 임시로 보관
 	map.pfn = __phys_to_pfn(FLUSH_BASE_PHYS + SZ_1M);
 	map.virtual = FLUSH_BASE_MINICACHE;
 	map.length = SZ_1M;
@@ -1437,12 +1445,21 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 	 * Create a mapping for the machine vectors at the high-vectors
 	 * location (0xffff0000).  If we aren't using high-vectors, also
 	 * create a mapping at the low-vectors virtual address.
+	 * low-vector : 0x0 에 벡터 테이블 갔다 놓음
+	 * high-vector : 0xffff0000 에 갔다 놓음 
+	 * 설정해서 바꿀 수 있음
+	 * HIGH 일 때 는 페이지 하나씩 (메모리 속성을 다르게 지정하려고, 
+	 * table은 user, kernel read only (MT_HIGH_VECTORS), 
+	 * stub 은 kernel 만 read only (MT_LOW_VECTORS)
+	 * LOW 일 때는  페이지 두개 한번에 매핑 ( table, stub 둘다 kernel read only)
+	 * HIGH 에는 항상 있는거고 Interrupt table 이 0x0 부터 시작하는
+	 * 아키텍처의 경우에는 0x0 번지에도 갔다 놓음(이러면 두군데 다 존재함?)
 	 */
 	map.pfn = __phys_to_pfn(virt_to_phys(vectors));
 	map.virtual = 0xffff0000;
 	map.length = PAGE_SIZE;
 #ifdef CONFIG_KUSER_HELPERS
-	map.type = MT_HIGH_VECTORS;
+	map.type = MT_HIGH_VECTORS;// user-mode 에서 이용 가능하게 해야하니까 user도 read가능
 #else
 	map.type = MT_LOW_VECTORS;
 #endif
@@ -1465,9 +1482,9 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 	/*
 	 * Ask the machine support to map in the statically mapped devices.
 	 */
-	if (mdesc->map_io)
+	if (mdesc->map_io) // 해당 아키텍처에서 map_io 함수가 지원될 때 호출, 아키텍처에서 필요한 IO 에 필요한 메모리 매핑을 하지 않을까..?
 		mdesc->map_io();
-	else
+	else // #ifdef CONFIG_DEBUG_LL 설정된 경우 디버깅 하는데 이용할 메모리 1페이지 예약
 		debug_ll_io_init();
 	fill_pmd_gaps();
 

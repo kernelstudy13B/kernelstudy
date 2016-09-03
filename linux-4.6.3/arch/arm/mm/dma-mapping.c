@@ -467,6 +467,7 @@ void __init dma_contiguous_remap(void)
 	 * dma_mmu_reamp[] DMA 영역이 등록되어 있음
 	 * device driver 가 사용하는 DMA 영역을 CMA(contiguous memory allocator)에 등록
 	 * 하고 사용
+	 * ioremap 해야할 device 하나당 static_vm 하나 
 	 */
 	for (i = 0; i < dma_mmu_remap_num; i++) {
 		phys_addr_t start = dma_mmu_remap[i].base;
