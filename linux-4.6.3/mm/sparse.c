@@ -171,6 +171,16 @@ void __init memory_present(int nid, unsigned long start, unsigned long end)
 {
 	unsigned long pfn;
 
+	/*
+	 * Flat memory 의 경우에는 mem_map 변수 하나만 이용하는데
+	 * sparse memory 의 경우 
+	 * usemap_map[]
+	 * mem_section[]
+	 * map_map[]
+	 * section_to_node_table[]
+	 * 이렇게 네개를 이용하고
+	 * 이 함수에서는 mem_section 매핑을 위한 할당 수행
+	 */
 	start &= PAGE_SECTION_MASK;
 	mminit_validate_memmodel_limits(&start, &end);
 	for (pfn = start; pfn < end; pfn += PAGES_PER_SECTION) {
@@ -516,6 +526,10 @@ static void __init alloc_usemap_and_memmap(void (*alloc_func)
 /*
  * Allocate the accumulated non-linear sections, allocate a mem_map
  * for each and record the physical to section mapping.
+ */
+/*
+ * memory 모델을 sparse model 을 이용할 때 usemap_map, map_map 을 할당
+ * 매핑 초기화
  */
 void __init sparse_init(void)
 {

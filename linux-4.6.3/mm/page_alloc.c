@@ -5589,22 +5589,28 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
 void __paginginit free_area_init_node(int nid, unsigned long *zones_size,
 		unsigned long node_start_pfn, unsigned long *zholes_size)
 {
-	pg_data_t *pgdat = NODE_DATA(nid);
+	pg_data_t *pgdat = NODE_DATA(nid); // 해당 nid 를 갖는 노드에 속한 페이지를 관리하는 구조체 포인터
 	unsigned long start_pfn = 0;
 	unsigned long end_pfn = 0;
 
 	/* pg_data_t should be reset to zero when it's allocated */
 	WARN_ON(pgdat->nr_zones || pgdat->classzone_idx);
 
-	reset_deferred_meminit(pgdat);
+	reset_deferred_meminit(pgdat); // pg_data_t->first_deffered_pfn = ULONG_MAX 
 	pgdat->node_id = nid;
 	pgdat->node_start_pfn = node_start_pfn;
-#ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
+#ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP 
+	/* NUMA
+	 * ARM 아키텍처에서는 NUMA 시스템을 동작시키려면 패치 적용이 필요하고  CONFIG_NUMA, 
+	 * CONFIG_HAVE_MEMBLOCK_NODE_MAP이 활성화 된다.
+	 * MEMBLOCK_NODE_MAP : NUMA 시스템이 관리하는 memblock 노드 맵
+	 * 패치라는건 코드의 패치(추가되거나 수정??) 되는것으로 추정
+	 */
 	get_pfn_range_for_nid(nid, &start_pfn, &end_pfn);
 	pr_info("Initmem setup node %d [mem %#018Lx-%#018Lx]\n", nid,
 		(u64)start_pfn << PAGE_SHIFT,
 		end_pfn ? ((u64)end_pfn << PAGE_SHIFT) - 1 : 0);
-#else
+#else // UMA
 	start_pfn = node_start_pfn;
 #endif
 	calculate_node_totalpages(pgdat, start_pfn, end_pfn,

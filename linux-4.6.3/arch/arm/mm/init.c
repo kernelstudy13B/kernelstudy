@@ -93,6 +93,11 @@ static void __init find_limits(unsigned long *min, unsigned long *max_low,
 	*max_low = PFN_DOWN(memblock_get_current_limit());
 	*min = PFN_UP(memblock_start_of_DRAM());
 	*max_high = PFN_DOWN(memblock_end_of_DRAM());
+	/*
+	 * max_lo
+	 * min 
+	 * max_low 
+	 */
 }
 
 #ifdef CONFIG_ZONE_DMA
@@ -108,7 +113,7 @@ EXPORT_SYMBOL(arm_dma_zone_size);
  */
 phys_addr_t arm_dma_limit;
 unsigned long arm_dma_pfn_limit;
-
+// low memory 공간에서 dma_zone 공간을 할당 (lowmemory 공간을 normal 과 dma 로 분리)
 static void __init arm_adjust_dma_zone(unsigned long *size, unsigned long *hole,
 	unsigned long dma_size)
 {
@@ -154,6 +159,7 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max_low,
 	 * to the zones, now is the time to do it.
 	 */
 	zone_size[0] = max_low - min;
+	// dma 랑 normal 이랑 합쳐서 lowmem 영역 지정
 #ifdef CONFIG_HIGHMEM
 	zone_size[ZONE_HIGHMEM] = max_high - max_low;
 #endif
@@ -167,11 +173,18 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max_low,
 		unsigned long start = memblock_region_memory_base_pfn(reg);
 		unsigned long end = memblock_region_memory_end_pfn(reg);
 
+		/*
+		 * start<max_low(현재 memblock 이 lowmem 영역에서(max_low아래에서) 시작할 경우)
+		 * memblock 크기를 zhole_size 계속 빼줌
+		 */
 		if (start < max_low) {
 			unsigned long low_end = min(end, max_low);
 			zhole_size[0] -= low_end - start;
 		}
 #ifdef CONFIG_HIGHMEM
+		/*
+		 * end>max_low(현재 memblock 이 highmem 영역에서 (max_low 위) 끝날 경우
+		 */
 		if (end > max_low) {
 			unsigned long high_start = max(start, max_low);
 			zhole_size[ZONE_HIGHMEM] -= end - high_start;
@@ -300,11 +313,19 @@ void __init bootmem_init(void)
 {
 	unsigned long min, max_low, max_high;
 
-	memblock_allow_resize();
+	memblock_allow_resize(); // memblock_can_resize = 1; 
 	max_low = max_high = 0;
 
 	find_limits(&min, &max_low, &max_high);
+	/*
+	 * min = memblock 1번째 region 의 base
+	 * max_low = memblock.current_limit
+	 * max_high = memblock 마지막 region 의 끝
+	 */
 
+
+	// min ~ max_low 까지 메모리 테스트
+	// memblock.memory.region[0].base ~ memblock.current_limit
 	early_memtest((phys_addr_t)min << PAGE_SHIFT,
 		      (phys_addr_t)max_low << PAGE_SHIFT);
 

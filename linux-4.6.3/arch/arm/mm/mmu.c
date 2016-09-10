@@ -1798,6 +1798,8 @@ void __init paging_init(const struct machine_desc *mdesc)
 	//0xffff0000 : TCM 설정이 끝난 부분으로 pmd가 가르키도록 함.
 
 	/* allocate the zero page. */
+	// 실제 write 를 하기전까지 memory 할당 요청을 하더라도 zero page 를 가리킬 것으로
+	// 추측됨, write를 할 때 실제 메모리 페이지 할당이 일어날 것으로 예측(copy on write 비슷하게) 
 	zero_page = early_alloc(PAGE_SIZE);
 
 	bootmem_init();

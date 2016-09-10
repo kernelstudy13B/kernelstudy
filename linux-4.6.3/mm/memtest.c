@@ -104,6 +104,7 @@ void __init early_memtest(phys_addr_t start, phys_addr_t end)
 	if (!memtest_pattern)
 		return;
 
+	// patterns 배열 -> 메모리 테스트용 
 	pr_info("early_memtest: # of tests: %u\n", memtest_pattern);
 	for (i = memtest_pattern-1; i < UINT_MAX; --i) {
 		idx = i % ARRAY_SIZE(patterns);
