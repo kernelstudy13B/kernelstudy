@@ -201,6 +201,7 @@ static inline unsigned int __attribute_const__ read_cpuid_cachetype(void)
 static inline unsigned int __attribute_const__ read_cpuid_tcmstatus(void)
 {
 	return read_cpuid(CPUID_TCM);
+	//TCMTR(TCM 타입 레지스터)에 접근하기 위해 CP15 레지스터를 읽어야 한다
 }
 
 static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)

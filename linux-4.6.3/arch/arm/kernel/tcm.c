@@ -119,21 +119,26 @@ static int __init setup_tcm_bank(u8 type, u8 bank, u8 banks,
 	 * If there are more than one TCM bank of this type,
 	 * select the TCM bank to operate on in the TCM selection
 	 * register.
+	 TCM뱅크가 하나 이상 있으면 TCM 선택 레지스터에서 작동시킬 TCM을  하나 선택.
 	 */
 	if (banks > 1)
-		asm("mcr	p15, 0, %0, c9, c2, 0"
+		asm("mcr	p15, 0, %0, c9, c2, 0"//TCMSR을 사용하여 TCM 선택
 		    : /* No output operands */
 		    : "r" (bank));
 
 	/* Read the special TCM region register c9, 0 */
-	if (!type)
-		asm("mrc	p15, 0, %0, c9, c1, 0"
+	//특수 TCM region 레지스터리를 읽는 부분.
+	if (!type)//즉 type=0,DTCM일때
+		asm("mrc	p15, 0, %0, c9, c1, 0"//DTCM region 레지스터를 통해 DTCM 정보 읽어옴.
 		    : "=r" (tcm_region));
-	else
-		asm("mrc	p15, 0, %0, c9, c1, 1"
+	else//type=1,ITCM일떄
+		asm("mrc	p15, 0, %0, c9, c1, 1"//ITCM region 레지스터르 통해 ITCM 정보 읽어옴.
 		    : "=r" (tcm_region));
+	//mrc을 이용하여 사이즈를 구해옴.
 
 	tcm_size = tcm_sizes[(tcm_region >> 2) & 0x0f];
+	//알아온 TCM 정보에서 사이즈를 지정하는 5비트 중 4비트만 읽어옴.(0x0f)
+	
 	if (tcm_size < 0) {
 		pr_err("CPU: %sTCM%d of unknown size\n",
 		       type ? "I" : "D", bank);
@@ -142,22 +147,24 @@ static int __init setup_tcm_bank(u8 type, u8 bank, u8 banks,
 		pr_err("CPU: %sTCM%d larger than 32k found\n",
 		       type ? "I" : "D", bank);
 		return -EINVAL;
-	} else {
+	} else {//오류 범위 아닌 부분을 모두 처리
 		pr_info("CPU: found %sTCM%d %dk @ %08x, %senabled\n",
 			type ? "I" : "D",
 			bank,
 			tcm_size,
-			(tcm_region & 0xfffff000U),
-			(tcm_region & 1) ? "" : "not ");
+			(tcm_region & 0xfffff000U),//base address(physical)
+			(tcm_region & 1) ? "" : "not ");//enabled
 	}
 
 	/* Not much fun you can do with a size 0 bank */
-	if (tcm_size == 0)
+	if (tcm_size == 0)//tcm_size가 0이면 TCM이 없는것으로 간주.
 		return 0;
 
 	/* Force move the TCM bank to where we want it, enable */
 	tcm_region = *offset | (tcm_region & 0x00000ffeU) | 1;
+	//tcm 오프셋 번경, 원하는 주소로 TCM 뱅크 할당.
 
+	//TCM region 레스터에 tcm_region 속성값을 기록.
 	if (!type)
 		asm("mcr	p15, 0, %0, c9, c1, 0"
 		    : /* No output operands */
@@ -169,6 +176,7 @@ static int __init setup_tcm_bank(u8 type, u8 bank, u8 banks,
 
 	/* Increase offset */
 	*offset += (tcm_size << 10);
+	//tcm_size * 1kb 만큼 추가하여 offset 변동.
 
 	pr_info("CPU: moved %sTCM%d %dk to %08x, enabled\n",
 		type ? "I" : "D",
@@ -252,6 +260,9 @@ static struct undef_hook tcm_hook __initdata = {
 /*
  * This initializes the TCM memory
  */
+//TCM 메모리 : Tight Coupled Memory, 캐시는 접근시간을 예측하지 않으므로 리얼타임 시스템같은 경우 이러한 예측이 필요하기 때문에 접근시간이 보장되어야 하는 경우 캐시와는 별개의 메모리가 필요, 캐시와는 달리 TCM은 메모리가 아닌 프로세서와 붙어있음.
+
+//32비트 arm리눅스에서 TCM 메모리의 최대 처리 용량은 32K
 void __init tcm_init(void)
 {
 	u32 tcm_status;
@@ -268,6 +279,7 @@ void __init tcm_init(void)
 	/*
 	 * Prior to ARMv5 there is no TCM, and trying to read the status
 	 * register will hang the processor.
+	v5이전 버전에는 TCM와 관련된 부분이 없으므로 패스.
 	 */
 	if (cpu_architecture() < CPU_ARCH_ARMv5) {
 		if (dtcm_code_sz || itcm_code_sz)
@@ -278,6 +290,9 @@ void __init tcm_init(void)
 	}
 
 	tcm_status = read_cpuid_tcmstatus();
+	//DTCM뱅크와 ITCM뱅크 수를 알아온다.
+	//DTCM : 데이터에 대한 TCM, ITCM : 명령에 대한 TCM.
+	//뱅크 : 접근속도가 동일한 (TCM)메모리의 집합??
 
 	/*
 	 * This code only supports v6-compatible TCMTR implementations.
@@ -287,10 +302,13 @@ void __init tcm_init(void)
 
 	dtcm_banks = (tcm_status >> 16) & 0x03;
 	itcm_banks = (tcm_status & 0x03);
+	//0번째 1번째 비트와 16번쨰 17번째 비트를 읽어와서 각 tcm 변수에 할당.
 
 	register_undef_hook(&tcm_hook);
+	//TCM과 관련된 undefined instruction이 발생했을떄 TCM hook을 추가
 
 	/* Values greater than 2 for D/ITCM banks are "reserved" */
+	//뱅크의 수는 0~2까지로 정해져있으므로 그 이상의 경우가 발견되면 수정해주는 부분.
 	if (dtcm_banks > 2)
 		dtcm_banks = 0;
 	if (itcm_banks > 2)
@@ -300,10 +318,13 @@ void __init tcm_init(void)
 	if (dtcm_banks > 0) {
 		for (i = 0; i < dtcm_banks; i++) {
 			ret = setup_tcm_bank(0, i, dtcm_banks, &dtcm_end);
+			//TCM 관련 레지스터 설정.
+			//dtcm_end는 위 함수에서 TCM 사이즈만큼 오프셋이 증가됨.
 			if (ret)
 				goto unregister;
 		}
 		/* This means you compiled more code than fits into DTCM */
+		//커널에 있는 DTCM용 데이터 사이즈가 실제 DTCM 영역(즉 우항은 TCM의 사이즈)보다 더 클 경우
 		if (dtcm_code_sz > (dtcm_end - DTCM_OFFSET)) {
 			pr_info("CPU DTCM: %u bytes of code compiled to "
 				"DTCM but only %lu bytes of DTCM present\n",
@@ -314,10 +335,12 @@ void __init tcm_init(void)
 		 * This means that the DTCM sizes were 0 or the DTCM banks
 		 * were inaccessible due to TrustZone configuration.
 		 */
+		//DTCM 사이즈가 0, 또는 DTCM 뱅크가 Trustzone 정의에 의해 접근 불가할떄.
 		if (!(dtcm_end - DTCM_OFFSET))
 			goto no_dtcm;
 		dtcm_res.end = dtcm_end - 1;
 		request_resource(&iomem_resource, &dtcm_res);
+		//iomem_resource에 tcm 영역 추가.
 		dtcm_iomap[0].length = dtcm_end - DTCM_OFFSET;
 		iotable_init(dtcm_iomap, 1);
 		/* Copy data from RAM to DTCM */
@@ -327,7 +350,7 @@ void __init tcm_init(void)
 		memcpy(start, ram, dtcm_code_sz);
 		pr_debug("CPU DTCM: copied data from %p - %p\n",
 			 start, end);
-		dtcm_present = true;
+		dtcm_present = true; //DTCM이 준비됨.
 	} else if (dtcm_code_sz) {
 		pr_info("CPU DTCM: %u bytes of code compiled to DTCM but no "
 			"DTCM banks present in CPU\n", dtcm_code_sz);

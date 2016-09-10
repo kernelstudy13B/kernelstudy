@@ -754,6 +754,7 @@ EXPORT_SYMBOL(phys_mem_access_prot);
 static void __init *early_alloc_aligned(unsigned long sz, unsigned long align)
 {
 	void *ptr = __va(memblock_alloc(sz, align));
+	//할당받은 memblock의 가상주소를 이용.
 	memset(ptr, 0, sz);
 	return ptr;
 }
@@ -777,14 +778,18 @@ static pte_t * __init arm_pte_alloc(pmd_t *pmd, unsigned long addr,
 {
 	if (pmd_none(*pmd)) {
 		pte_t *pte = alloc(PTE_HWTABLE_OFF + PTE_HWTABLE_SIZE);
+		//pte 할당. 각 아키텍처마다 정의 되어있는 alloc 콜백 함수로 할당.
 		__pmd_populate(pmd, __pa(pte), prot);
+		//할당된 pte로 pmd를 정의.
 	}
 	BUG_ON(pmd_bad(*pmd));
 	return pte_offset_kernel(pmd, addr);
+	//할당한 pte의 오프셋 리턴.
 }
 
 static pte_t * __init early_pte_alloc(pmd_t *pmd, unsigned long addr,
 				      unsigned long prot)
+		//
 {
 	return arm_pte_alloc(pmd, addr, prot, early_alloc);
 }
@@ -1506,13 +1511,25 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
 
 static void __init kmap_init(void)
 {
+		/*
+		   하이메모리 사용 준비 함수
+
+		   정리 : highmemory - 유저 영역, lowmemory - 커널 영역
+		   1. highmem 영역을 user에서 접근 시 당연히 항상 매핑.
+		   2. highmem 영역을 kernel에서 접근할 때 kernel에서 1:1 다이렉트 매핑된 채 운영되지 않고 별도의 매핑이 필요
+		   */
 #ifdef CONFIG_HIGHMEM
 	pkmap_page_table = early_pte_alloc(pmd_off_k(PKMAP_BASE),
 		PKMAP_BASE, _PAGE_KERNEL_TABLE);
-#endif
+	//pkmap : persistence kernel mapping(kmap이 이와같이 명명됨)
+	//HIGHMEM 설정시에만 pkmap용 pte 테이블 초기화.
+	//pkmap 사용을 위해 pkmap_page_table 전역 변수에 pkmap 시작주소에 해당하는 pmd 엔트리 주소를 알아옴.
+	//pmd_off_k : pmd 엔트리의 주소를 리턴하는 함수. 이 pmd로 highmem을 관리.
 
+#endif
 	early_pte_alloc(pmd_off_k(FIXADDR_START), FIXADDR_START,
 			_PAGE_KERNEL_TABLE);
+	//fixmap 사용을 위해 pte 테이블을 준비. pkmap테이블과 달리 지시하는 변수가 없음.
 }
 
 static void __init map_lowmem(void)
@@ -1774,10 +1791,11 @@ void __init paging_init(const struct machine_desc *mdesc)
 	 */
 	early_fixmap_shutdown();
 	devicemaps_init(mdesc);
-	kmap_init();
+	kmap_init();//하이 메모리 사용을 준비 하는 함수.
 	tcm_init();
 
 	top_pmd = pmd_off_k(0xffff0000);
+	//0xffff0000 : TCM 설정이 끝난 부분으로 pmd가 가르키도록 함.
 
 	/* allocate the zero page. */
 	zero_page = early_alloc(PAGE_SIZE);
