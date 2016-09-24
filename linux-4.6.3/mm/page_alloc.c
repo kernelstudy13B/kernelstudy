@@ -5388,15 +5388,20 @@ void __paginginit set_pageblock_order(void)
 	if (pageblock_order)
 		return;
 
-	if (HPAGE_SHIFT > PAGE_SHIFT)
+	if (HPAGE_SHIFT > PAGE_SHIFT)///SHIFT는 크기
 		order = HUGETLB_PAGE_ORDER;
 	else
 		order = MAX_ORDER - 1;
+	//캐싱 블록의 단위를 설정-> huge page의 크기가 커짐
 
 	/*
 	 * Assume the largest contiguous order of interest is a huge page.
 	 * This value may be variable depending on boot parameters on IA64 and
 	 * powerpc.
+	 페이지가 huge 할때를 가정. 그러면 order의 값은 IA64, powerpc의 boot 패러미터에  
+	 의존. 여기서 말하는 order는 huge page에 대한 정의 여부를 가리는 변수.
+	 IA64, powerpc의 아키텍처(huge page)일떄 정의되는 함수.
+	 huge page : 보통 2MB or 1GB로 정의, 상위 단위 용량의 메모리 관리를 위해 지정됨. 
 	 */
 	pageblock_order = order;
 }

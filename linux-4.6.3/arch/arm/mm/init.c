@@ -217,7 +217,7 @@ EXPORT_SYMBOL(pfn_valid);
 static void __init arm_memory_present(void)
 {
 }
-#else
+#else//with sparse mem 
 static void __init arm_memory_present(void)
 {
 	struct memblock_region *reg;
@@ -311,9 +311,15 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
 
 void __init bootmem_init(void)
 {
+	//부트 타임에 사용할 메모리 할당자 활성화 함수, 
+	//슬랩할당자가 활성화되기 전까지 사용
+	//memblock으로부터 lowmem 영역 경계 파악, 각 zone으로 경계 나눠 설정후 '0번 노드 빈 페이지들을 초기화'.
+
 	unsigned long min, max_low, max_high;
 
-	memblock_allow_resize(); // memblock_can_resize = 1; 
+	memblock_allow_resize(); 
+	// memblock_can_resize = 1; 
+	//리사이즈 가능하게 하여 memblock 관리 영역이 모자랄떄 2배단위로 커지게 함.
 	max_low = max_high = 0;
 
 	find_limits(&min, &max_low, &max_high);
@@ -326,15 +332,19 @@ void __init bootmem_init(void)
 
 	// min ~ max_low 까지 메모리 테스트
 	// memblock.memory.region[0].base ~ memblock.current_limit
+	
 	early_memtest((phys_addr_t)min << PAGE_SHIFT,
 		      (phys_addr_t)max_low << PAGE_SHIFT);
+	
 
 	/*
 	 * Sparsemem tries to allocate bootmem in memory_present(),
 	 * so must be done after the fixed reservations
 	 */
 	arm_memory_present();
-
+	//sparse mem의 필요한 부분 설정.
+	//flatmem : 각각 프로그램에 프로그램 부분과 데이터 부분이 같은 공간을 사용.
+	//(한 덩어리의 mem_map을 사용)
 	/*
 	 * sparse_init() needs the bootmem allocator up and running.
 	 */
