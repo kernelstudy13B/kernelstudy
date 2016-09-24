@@ -160,6 +160,7 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max_low,
 	 */
 	zone_size[0] = max_low - min;
 	// dma 랑 normal 이랑 합쳐서 lowmem 영역 지정
+	// zone_size[0] : lowmem 영역
 #ifdef CONFIG_HIGHMEM
 	zone_size[ZONE_HIGHMEM] = max_high - max_low;
 #endif
@@ -348,6 +349,7 @@ void __init bootmem_init(void)
 	/*
 	 * sparse_init() needs the bootmem allocator up and running.
 	 */
+	// sparse memory model 에서 이용하는 map들과 usemap들 할당, 초기화
 	sparse_init();
 
 	/*

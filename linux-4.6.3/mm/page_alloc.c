@@ -5312,6 +5312,10 @@ static void __meminit calculate_node_totalpages(struct pglist_data *pgdat,
 		struct zone *zone = pgdat->node_zones + i;
 		unsigned long zone_start_pfn, zone_end_pfn;
 		unsigned long size, real_size;
+		/*
+		 * size : 존 전체의 페이지 개수
+		 * real size : 비어 있지않은 존 안의 페이지 개수
+		 */
 
 		size = zone_spanned_pages_in_node(pgdat->node_id, i,
 						  node_start_pfn,
@@ -5332,7 +5336,10 @@ static void __meminit calculate_node_totalpages(struct pglist_data *pgdat,
 		totalpages += size;
 		realtotalpages += real_size;
 	}
-
+	/*
+	 * alloc_node_mem_map 함수에서
+	 * node_spanned_pages에 지정된 #0 pfn 부터 totalpages 만큼의 struct page 를 할당함
+	 */
 	pgdat->node_spanned_pages = totalpages;
 	pgdat->node_present_pages = realtotalpages;
 	printk(KERN_DEBUG "On node %d totalpages: %lu\n", pgdat->node_id,
@@ -5434,8 +5441,10 @@ static unsigned long __paginginit calc_memmap_size(unsigned long spanned_pages,
 	 */
 	if (spanned_pages > present_pages + (present_pages >> 4) &&
 	    IS_ENABLED(CONFIG_SPARSEMEM))
+		// Sparse 면 hole을 고려해서 realsize 를 이용해야함
 		pages = present_pages;
-
+		// Flat 이면 hole이 없을테니 totalsize를 이용하면 됨
+		//(전체 페이지수 * 메모리관리구조체)가 차지하는 페이지 수 리턴
 	return PAGE_ALIGN(pages * sizeof(struct page)) >> PAGE_SHIFT;
 }
 
@@ -5460,24 +5469,35 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat)
 	pgdat->numabalancing_migrate_next_window = jiffies;
 #endif
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	/*
+	 * huge page 사용이 transparent 하게 제공되기 위해서 
+	 * 필요한 spin lock, spilit_queue 등의 정보 초기화
+	 */
 	spin_lock_init(&pgdat->split_queue_lock);
 	INIT_LIST_HEAD(&pgdat->split_queue);
 	pgdat->split_queue_len = 0;
 #endif
-	init_waitqueue_head(&pgdat->kswapd_wait);
+	init_waitqueue_head(&pgdat->kswapd_wait);  
+	// kernel swap daemon wait queue, memory swap할 때 사용 
 	init_waitqueue_head(&pgdat->pfmemalloc_wait);
+	// Page frame memory alloc, pf 할당할 때 사용 
 #ifdef CONFIG_COMPACTION
 	init_waitqueue_head(&pgdat->kcompactd_wait);
+	// kernel compaction daemon, fragmentation 메모리 모음
 #endif
 	pgdat_page_ext_init(pgdat);
+	/*
+	 * CONFIG_SPARSEMEM defined 되있으면 아무것도 안하고
+	 * define 안되있으면 pgdat->node_page_ext = NULL;
+	 */
 
 	for (j = 0; j < MAX_NR_ZONES; j++) {
 		struct zone *zone = pgdat->node_zones + j;
 		unsigned long size, realsize, freesize, memmap_pages;
 		unsigned long zone_start_pfn = zone->zone_start_pfn;
 
-		size = zone->spanned_pages;
-		realsize = freesize = zone->present_pages;
+		size = zone->spanned_pages; // totalpages
+		realsize = freesize = zone->present_pages; // 홀을제외한 page들의 수
 
 		/*
 		 * Adjust freesize so that it accounts for how much memory
@@ -5485,8 +5505,10 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat)
 		 * and per-cpu initialisations
 		 */
 		memmap_pages = calc_memmap_size(size, realsize);
-		if (!is_highmem_idx(j)) {
-			if (freesize >= memmap_pages) {
+		// struct page 들이 차지하고 있는 페이지의 개수, memmap page 수를 구함
+		if (!is_highmem_idx(j)) { // lowmem 인 경우
+			if (freesize >= memmap_pages) { 
+				// memmap_page수(struct page 수) 만큼 freesize 에서 뺌
 				freesize -= memmap_pages;
 				if (memmap_pages)
 					printk(KERN_DEBUG
@@ -5498,17 +5520,20 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat)
 		}
 
 		/* Account for reserved pages */
-		if (j == 0 && freesize > dma_reserve) {
+		if (j == 0 && freesize > dma_reserve) { // DMA 인경우 dma 영역 크기 만큼 뺌
 			freesize -= dma_reserve;
 			printk(KERN_DEBUG "  %s zone: %lu pages reserved\n",
 					zone_names[0], dma_reserve);
 		}
-
-		if (!is_highmem_idx(j))
-			nr_kernel_pages += freesize;
+		
+		// ZONE_DMA, ZONE_DMA32, ZONE_NORMAL 먼저 수행되니 nr_kernel_pages가
+		// 다 늘어난 뒤에 else if 가 수행
+		if (!is_highmem_idx(j)) // lowmem 일 때
+			nr_kernel_pages += freesize; // 남은 페이지들은 커널이 다 쓰도록
 		/* Charge for highmem memmap if there are enough kernel pages */
 		else if (nr_kernel_pages > memmap_pages * 2)
 			nr_kernel_pages -= memmap_pages;
+		// if, elif 안걸리는 경우, highmem면서 nr_kernel_pages <= memmap_pages 
 		nr_all_pages += freesize;
 
 		/*
@@ -5517,6 +5542,9 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat)
 		 * And all highmem pages will be managed by the buddy system.
 		 */
 		zone->managed_pages = is_highmem_idx(j) ? realsize : freesize;
+		// highmem 이면 struct page 관리 영역이 없으니까 realsize로 할당(버디 할당자
+		// 에 의해 관리될 영역)
+		// lowmem 이면 struct page 관리 페이지들을 뺀 freesize로 할당  
 #ifdef CONFIG_NUMA
 		zone->node = nid;
 		zone->min_unmapped_pages = (freesize*sysctl_min_unmapped_ratio)
@@ -5567,14 +5595,16 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
 		 * aligned but the node_mem_map endpoints must be in order
 		 * for the buddy allocator to function correctly.
 		 */
-		end = pgdat_end_pfn(pgdat);
+		end = pgdat_end_pfn(pgdat); // start + size 
 		end = ALIGN(end, MAX_ORDER_NR_PAGES);
 		size =  (end - start) * sizeof(struct page);
 		map = alloc_remap(pgdat->node_id, size);
-		if (!map)
+		if (!map) // tile arch는 alloc_remap에서 처리 대부분은 아래 함수로 처리
 			map = memblock_virt_alloc_node_nopanic(size,
 							       pgdat->node_id);
-		pgdat->node_mem_map = map + offset;
+		pgdat->node_mem_map = map + offset; 
+		// start를 내림해서 할당 받았으니, 실제 시작주소를 찾기위해
+		// 다시 offset 더함
 	}
 #ifndef CONFIG_NEED_MULTIPLE_NODES
 	/*
@@ -5583,6 +5613,7 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
 	if (pgdat == NODE_DATA(0)) {
 		mem_map = NODE_DATA(0)->node_mem_map;
 #if defined(CONFIG_HAVE_MEMBLOCK_NODE_MAP) || defined(CONFIG_FLATMEM)
+		// 위에서 더했는데 다르네... 다시 뺴야지...
 		if (page_to_pfn(mem_map) != pgdat->node_start_pfn)
 			mem_map -= offset;
 #endif /* CONFIG_HAVE_MEMBLOCK_NODE_MAP */
@@ -5622,6 +5653,7 @@ void __paginginit free_area_init_node(int nid, unsigned long *zones_size,
 				  zones_size, zholes_size);
 
 	alloc_node_mem_map(pgdat);
+	// pgdat 의 0 번 노드에 struct page 들을 여러개 달아놈
 #ifdef CONFIG_FLAT_NODE_MEM_MAP
 	printk(KERN_DEBUG "free_area_init_node: node %d, pgdat %08lx, node_mem_map %08lx\n",
 		nid, (unsigned long)pgdat,

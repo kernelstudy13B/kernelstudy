@@ -251,10 +251,12 @@ static int __meminit sparse_init_one_section(struct mem_section *ms,
 	if (!present_section(ms))
 		return -EINVAL;
 
+	// bit 연산 같지만, encoding 해서 mem_map 매다는 것, 나중에 디코딩해서 이용
+	// sparse_encode_mem_map 함수에서 인코딩 (주소 - PFN)
 	ms->section_mem_map &= ~SECTION_MAP_MASK;
 	ms->section_mem_map |= sparse_encode_mem_map(mem_map, pnum) |
 							SECTION_HAS_MEM_MAP;
- 	ms->pageblock_flags = pageblock_bitmap;
+ 	ms->pageblock_flags = pageblock_bitmap; // usemap 매달기
 
 	return 1;
 }
@@ -413,8 +415,12 @@ void __init sparse_mem_maps_populate_node(struct page **map_map,
 	unsigned long pnum;
 	unsigned long size = sizeof(struct page) * PAGES_PER_SECTION;
 
-	map = alloc_remap(nodeid, size * map_count);
-	if (map) {
+	/*
+	 * tile archtecture 의 경우 remap 함수가 할당되서 불리고
+	 * 나머지의 경우 remap 함수는 NULL 리턴해서 아래 if 문 무시
+	 */
+	map = alloc_remap(nodeid, size * map_count); 
+	if (map) { 
 		for (pnum = pnum_begin; pnum < pnum_end; pnum++) {
 			if (!present_section_nr(pnum))
 				continue;
@@ -424,7 +430,7 @@ void __init sparse_mem_maps_populate_node(struct page **map_map,
 		return;
 	}
 
-	size = PAGE_ALIGN(size);
+	size = PAGE_ALIGN(size); // 올림
 	map = memblock_virt_alloc_try_nid(size * map_count,
 					  PAGE_SIZE, __pa(MAX_DMA_ADDRESS),
 					  BOOTMEM_ALLOC_ACCESSIBLE, nodeid);
@@ -591,7 +597,7 @@ void __init sparse_init(void)
 		panic("can not allocate usemap_map\n");
 	alloc_usemap_and_memmap(sparse_early_usemaps_alloc_node,
 							(void *)usemap_map);
-	//한개 노드에 대한 usemap 할당, 그 usemap을 usemap_map[]에 매핑.
+	//노드에 대한 usemap 할당, 그 usemap을 usemap_map[]에 매핑.
 
 #ifdef CONFIG_SPARSEMEM_ALLOC_MEM_MAP_TOGETHER
 	size2 = sizeof(struct page *) * NR_MEM_SECTIONS;
@@ -618,12 +624,19 @@ void __init sparse_init(void)
 		if (!map)
 			continue;
 
+		/*
+		 * usemap map 은 섹션단위로 되어 있고
+		 * struct mem_section 은 섹션들을 관리하기 위한 정보들을 갖고 있음
+		 * sparse_init_one_section 에서 해당 섹션에 대한 usemap과 map들의
+		 * 정보를 링크
+		 */
 		sparse_init_one_section(__nr_to_section(pnum), pnum, map,
 								usemap);
 	}
 
 	vmemmap_populate_print_last();
 
+// struct mem_section 에 전부 다 매달아 놨으니 지역변수들 free
 #ifdef CONFIG_SPARSEMEM_ALLOC_MEM_MAP_TOGETHER
 	memblock_free_early(__pa(map_map), size2);
 #endif
