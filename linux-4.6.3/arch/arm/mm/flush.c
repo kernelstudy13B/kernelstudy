@@ -50,6 +50,7 @@ static void flush_pfn_alias(unsigned long pfn, unsigned long vaddr)
 	    :
 	    : "r" (to), "r" (to + PAGE_SIZE - 1), "r" (zero)
 	    : "cc");
+	//%0~%1까지 주소에 Clean and flush the line 명령 수행
 }
 
 static void flush_icache_alias(unsigned long pfn, unsigned long vaddr, unsigned long len)
@@ -201,28 +202,55 @@ void copy_to_user_page(struct vm_area_struct *vma, struct page *page,
 
 void __flush_dcache_page(struct address_space *mapping, struct page *page)
 {
+	//page 구조체가 가리키는 메모리 영역에 대한 d-cache flush
+	//d-cache : data cache
 	/*
 	 * Writeback any data associated with the kernel mapping of this
 	 * page.  This ensures that data in the physical page is mutually
 	 * coherent with the kernels mapping.
+	 ->페이지의 커널매핑과 연관된 어떤 데이터를 writeback. physical 페이지의 데이터가 커널매핑과 상호적으로 연결되어있음을 보장한다.
 	 */
-	if (!PageHighMem(page)) {
+	if (!PageHighMem(page)) {//highmem이 아닐때, physical 매핑이 불가
 		size_t page_size = PAGE_SIZE << compound_order(page);
+		//페이지 사이즈(PAGE_SIZE)에서 2의 compound_order(페이지 정보에서 가져옴)
+		//승을 곱한다
 		__cpuc_flush_dcache_area(page_address(page), page_size);
-	} else {
+		//하드웨어 종속적인 콜백 함수를 수행.
+		//Ensure that the data held in page is written back.
+		//->페이지가 가지고 있는 데이터를 writeback하는 함수.
+		//page_address : 페이지의 가상주소를 얻어옴.
+		
+	} else {//highmem일 경우
 		unsigned long i;
 		if (cache_is_vipt_nonaliasing()) {
+	//캐시 타입이 vipt nonaliasing인 경우
+	//pipt : aliasing에 대한 이슈가 없는 방식이지만 TLB hit 발생시 속도 저하.
+	//pivt : 이론적으로 존재할 뿐 실제로 사용하지 않는 방식.
+	//vivt : 서로 다른 가상 주소가 물리 주소를 가리키는 aliasing 문제가 발생. 
+	/*vipt nonaliasing : virtually index, physically tagged cache, latency가 줄어듬.
+			     가상주소가 겹쳐도 물리메모리가 태그됨.
+			     aliasing은 두개의 가상주소가 하나의 물리메모리를 가리킴.
+	 */		     
 			for (i = 0; i < (1 << compound_order(page)); i++) {
 				void *addr = kmap_atomic(page + i);
+				//fixmap 영역에 highmem 메모리 한 페이지를 매핑.
+				//현재 cpu에 해당하는 fixmap 영역을 사용하여 매핑.
+				//이미 kmap 영역에 매핑된 경우 해당 가상주소를 리턴.
+				//fixmap : 극히 짧은 시간 매핑이 필요할떄 사용.
 				__cpuc_flush_dcache_area(addr, PAGE_SIZE);
 				kunmap_atomic(addr);
+				//kmap_atomic을 사용하여 fixmap 영역에 매핑된 highmem 해제
+				//사실상 모든 주소구간을 모두 해제.
 			}
-		} else {
+		} else {//vipt nonaliasing이 아닌경우,이미 kmap 매핑된 가상 주소를 찾아 flush 후 해제
 			for (i = 0; i < (1 << compound_order(page)); i++) {
 				void *addr = kmap_high_get(page + i);
+				//이미 kmap 매핑된 가상주소를 찾는다.
+				//매핑이 되지 않았는데도 사용중인 구간에 대해(aliasing이				  된 구간에 대한 flush를 방지.
 				if (addr) {
 					__cpuc_flush_dcache_area(addr, PAGE_SIZE);
 					kunmap_high(page + i);
+					//kmap 영역에 매핑된 highmem 페이지 주소 매핑.
 				}
 			}
 		}
@@ -232,8 +260,10 @@ void __flush_dcache_page(struct address_space *mapping, struct page *page)
 	 * If this is a page cache page, and we have an aliasing VIPT cache,
 	 * we only need to do one flush - which would be at the relevant
 	 * userspace colour, which is congruent with page->index.
+	 페이지 캐시이고 vipt aliasing이면, 유저스페이스 colour와 연관될 하나의 flush를 실행,  
 	 */
 	if (mapping && cache_is_vipt_aliasing())
+		//인수로 요청한 mapping 있는경우(주석 입력 시점에선 mapping NULL)이면서 vipt aliasing인 경우(TLB flush와 연관된 부분)
 		flush_pfn_alias(page_to_pfn(page),
 				page->index << PAGE_SHIFT);
 }

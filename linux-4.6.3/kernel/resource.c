@@ -230,7 +230,7 @@ static struct resource * __request_resource(struct resource *root, struct resour
 	for (;;) {
 		tmp = *p;
 		if (!tmp || tmp->start > end) {
-			new->sibling = tmp;
+			new->sibling = tmp;//자식이 존재하는 경우
 			*p = new;
 			new->parent = root;
 			return NULL;

@@ -1805,5 +1805,6 @@ void __init paging_init(const struct machine_desc *mdesc)
 	bootmem_init();
 
 	empty_zero_page = virt_to_page(zero_page);
+	//가상 주소를 page 구조체로 변환. 즉 제로 페이지의 page 구조체를 구한다.
 	__flush_dcache_page(NULL, empty_zero_page);
 }

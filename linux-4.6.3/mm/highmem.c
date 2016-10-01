@@ -304,6 +304,7 @@ EXPORT_SYMBOL(kmap_high);
  * Returns the page's current virtual memory address, or NULL if no mapping
  * exists.  If and only if a non null address is returned then a
  * matching call to kunmap_high() is necessary.
+   //페이지의 현재 가상메모리 주소를 리턴, 만약 매핑이 존재하지 않으면NULL
  *
  * This can be called from any context.
  */

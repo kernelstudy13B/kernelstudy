@@ -88,6 +88,7 @@
  *	flush_kern_dcache_area(kaddr, size)
  *
  *		Ensure that the data held in page is written back.
+				
  *		- kaddr  - page address
  *		- size   - region size
  *

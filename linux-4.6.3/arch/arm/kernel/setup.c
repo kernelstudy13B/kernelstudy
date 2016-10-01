@@ -886,15 +886,16 @@ early_param("mem", early_mem);
 
 static void __init request_standard_resources(const struct machine_desc *mdesc)
 {
-	struct memblock_region *region;
+	struct memblock_region *region;//memblock 
 	struct resource *res;
 
 	kernel_code.start   = virt_to_phys(_text);
 	kernel_code.end     = virt_to_phys(_etext - 1);
 	kernel_data.start   = virt_to_phys(_sdata);
 	kernel_data.end     = virt_to_phys(_end - 1);
+	//커널 구간 지정.
 
-	for_each_memblock(memory, region) {
+	for_each_memblock(memory, region) {//memblock 루프 시작
 		res = memblock_virt_alloc(sizeof(*res), 0);
 		res->name  = "System RAM";
 		res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
@@ -904,14 +905,15 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
 		request_resource(&iomem_resource, res);
 
 		if (kernel_code.start >= res->start &&
-		    kernel_code.end <= res->end)
+		    kernel_code.end <= res->end)//커널의 코드가 리소스 안에 있을 경우
 			request_resource(res, &kernel_code);
 		if (kernel_data.start >= res->start &&
-		    kernel_data.end <= res->end)
+		    kernel_data.end <= res->end)//커널의 데이터가 리소스 안에 있을 겨우
 			request_resource(res, &kernel_data);
 	}
 
 	if (mdesc->video_start) {
+	//video : console display, 부팅 할때 텍스트를 출력하기 위한 메모리.
 		video_ram.start = mdesc->video_start;
 		video_ram.end   = mdesc->video_end;
 		request_resource(&iomem_resource, &video_ram);
@@ -921,7 +923,8 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
 	 * Some machines don't have the possibility of ever
 	 * possessing lp0, lp1 or lp2
 	 */
-	if (mdesc->reserve_lp0)
+	if (mdesc->reserve_lp0)//lp : line printer?
+		//io port(pci로 예상)와 관련된 장치가 존재하는 경우...
 		request_resource(&ioport_resource, &lp0);
 	if (mdesc->reserve_lp1)
 		request_resource(&ioport_resource, &lp1);
@@ -1124,7 +1127,7 @@ gpio : general purpose.
 	early_ioremap_reset();
 
 	paging_init(mdesc);//메모리 페이징 준비.
-	request_standard_resources(mdesc);
+	request_standard_resources(mdesc);//리소스 트리 구성
 
 	if (mdesc->restart)
 		arm_pm_restart = mdesc->restart;

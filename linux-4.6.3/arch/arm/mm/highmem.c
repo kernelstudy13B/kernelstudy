@@ -74,7 +74,7 @@ void *kmap_atomic(struct page *page)
 	else
 #endif
 		kmap = kmap_high_get(page);
-	if (kmap)
+	if (kmap)//이미 kmap 영역에 매핑이 된 경우
 		return kmap;
 
 	type = kmap_atomic_idx_push();
