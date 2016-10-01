@@ -81,6 +81,7 @@ struct fdt_reserve_entry {
 struct fdt_node_header {
 	fdt32_t tag;
 	char name[0];
+	// 가변 크기 배열 선언
 };
 
 struct fdt_property {

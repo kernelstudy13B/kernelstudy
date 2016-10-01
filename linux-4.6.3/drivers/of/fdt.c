@@ -196,15 +196,27 @@ static void * unflatten_dt_node(const void *blob,
 		return mem;
 
 	allocl = ++l;
-
+	/*
+	 * allocl : 널 문자 포함 길이
+	 * l : 노드명 길이
+	 */
+	
 	/* version 0x10 has a more compact unit name here instead of the full
 	 * path. we accumulate the full path size using "fpsize", we'll rebuild
 	 * it later. We detect this because the first character of the name is
 	 * not '/'.
+	 *
+	 * DTB version 0x10 부터 compact 스타일 사용(상대 경로 비슷한 개념)
+	 * 그 전에는 full path 스타일 사용(절대 경로 비슷) 
+	 *
 	 */
-	if ((*pathp) != '/') {
+	if ((*pathp) != '/') { // compact 스타일인 경우, DTB version 0x10 이상 
 		new_format = 1;
-		if (fpsize == 0) {
+		/*
+		 * 0 : full path format
+		 * 1 : compact path format
+		 */
+		if (fpsize == 0) { // fpsize : full path size
 			/* root node: special case. fpsize accounts for path
 			 * plus terminating zero. root node only has '/', so
 			 * fpsize should be 2, but we want to avoid the first
@@ -217,6 +229,7 @@ static void * unflatten_dt_node(const void *blob,
 		} else {
 			/* account for '/' and path size minus terminal 0
 			 * already in 'l'
+			 * sub 노드 처리를 위해 재귀 호출된 경우
 			 */
 			fpsize += l;
 			allocl = fpsize;
@@ -224,14 +237,18 @@ static void * unflatten_dt_node(const void *blob,
 	}
 
 	np = unflatten_dt_alloc(&mem, sizeof(struct device_node) + allocl,
-				__alignof__(struct device_node));
+				__alignof__(struct device_node)); // memory align
+	// np = 함수에 들어가기전의 mem 주소
+	// mem은 함수가 끝나면 sizeof(struct device_node) + allocl 후의 주소	
 	if (!dryrun) {
 		char *fn;
-		of_node_init(np);
+		of_node_init(np); //초기화 kobject : 디바이스를 객체로 추상화한 구조체
 		np->full_name = fn = ((char *)np) + sizeof(*np);
-		if (new_format) {
+		if (new_format) { // 0x10 version compact format
 			/* rebuild full path for new format */
-			if (dad && dad->parent) {
+			if (dad && dad->parent) { 
+				// dad가 처음엔 NULL로 들어옴
+				// 아빠랑 할아버지 노드가 있는경우(depth 2이상)
 				strcpy(fn, dad->full_name);
 #ifdef DEBUG
 				if ((strlen(fn) + l + 1) != allocl) {
@@ -244,22 +261,25 @@ static void * unflatten_dt_node(const void *blob,
 			}
 			*(fn++) = '/';
 		}
-		memcpy(fn, pathp, l);
+		memcpy(fn, pathp, l);// pathp 에 아빠 경로뒤에 내 경로를 붙임
 
-		prev_pp = &np->properties;
-		if (dad != NULL) {
+		prev_pp = &np->properties; 
+		if (dad != NULL) { // 트리에 삽입, 추가 
 			np->parent = dad;
 			np->sibling = dad->child;
 			dad->child = np;
 		}
 	}
 	/* process properties */
+	// 한 노드안에서 속성들을 순회
 	for (offset = fdt_first_property_offset(blob, *poffset);
 	     (offset >= 0);
 	     (offset = fdt_next_property_offset(blob, offset))) {
 		const char *pname;
 		u32 sz;
 
+		// offset 을 통해서 property 를 가져옴 
+		// pname : 속성명, sz : 속성데이터 사이즈, p : 속성데이터 
 		if (!(p = fdt_getprop_by_offset(blob, offset, &pname, &sz))) {
 			offset = -FDT_ERR_INTERNAL;
 			break;
@@ -269,11 +289,20 @@ static void * unflatten_dt_node(const void *blob,
 			pr_info("Can't find property name in list !\n");
 			break;
 		}
-		if (strcmp(pname, "name") == 0)
+		// 현재 노드내에 name 속성이 없을때 추가로 "name" 속성을 만들기위해
+		// 체크 해둠
+		// compact 노드명을 사용하는 DTB version 0x10에는 name 속성이 없지만
+		// expanded format을 구성할 때는 각 노드의 name 속성이 필요하다.
+		if (strcmp(pname, "name") == 0) 
 			has_name = 1;
+		/*
+		 * pp는 함수 들어가기전 mem 주소
+		 * mem은 함수호출 할당하고 늘어난 주소
+		 */
 		pp = unflatten_dt_alloc(&mem, sizeof(struct property),
 					__alignof__(struct property));
-		if (!dryrun) {
+
+		if (!dryrun) { // 두번째 호출 시
 			/* We accept flattened tree phandles either in
 			 * ePAPR-style "phandle" properties, or the
 			 * legacy "linux,phandle" properties.  If both
@@ -289,6 +318,7 @@ static void * unflatten_dt_node(const void *blob,
 			 * stuff */
 			if (strcmp(pname, "ibm,phandle") == 0)
 				np->phandle = be32_to_cpup(p);
+			// phandle 이 뭔지 모르겠음
 			pp->name = (char *)pname;
 			pp->length = sz;
 			pp->value = (__be32 *)p;
@@ -298,6 +328,7 @@ static void * unflatten_dt_node(const void *blob,
 	}
 	/* with version 0x10 we may not have the name property, recreate
 	 * it here from the unit name if absent
+	 * has_name : 0 이면 0x10 이고, pathp = "" 했던 설정을 여기서  바꿔줌
 	 */
 	if (!has_name) {
 		const char *p1 = pathp, *ps = pathp, *pa = NULL;
@@ -310,12 +341,16 @@ static void * unflatten_dt_node(const void *blob,
 				ps = p1 + 1;
 			p1++;
 		}
-		if (pa < ps)
+		if (pa < ps) // pathp 의 마지막 / 이후에 @가 안나온 경우 pa는 null
 			pa = p1;
-		sz = (pa - ps) + 1;
+		sz = (pa - ps) + 1; // pa : @위치, ps : / +1 위치
+		// ex) pathp = "/abc/a@1000" sz = 2
+		// ex) pathp = "abc@1000" sz = 4
 		pp = unflatten_dt_alloc(&mem, sizeof(struct property) + sz,
 					__alignof__(struct property));
-		if (!dryrun) {
+		// 속성 구조체 정보단위로 속성 구조체 사이즈, sz(value+1) 만큼 사용할 주소를
+		// pp에 놓고 mem은 그 크기만큼 증가
+		if (!dryrun) { // name 속성 생성
 			pp->name = "name";
 			pp->length = sz;
 			pp->value = pp + 1;
@@ -340,9 +375,11 @@ static void * unflatten_dt_node(const void *blob,
 
 	old_depth = depth;
 	*poffset = fdt_next_node(blob, *poffset, &depth);
+	// 첫 노드의 depth를 찾아옴 
+	// 
 	if (depth < 0)
 		depth = 0;
-	while (*poffset > 0 && depth > old_depth)
+	while (*poffset > 0 && depth > old_depth) //depth 가 old_depth 보다 크면 재귀 호출
 		mem = unflatten_dt_node(blob, mem, poffset, np, NULL,
 					fpsize, dryrun);
 
@@ -409,7 +446,12 @@ static void __unflatten_device_tree(const void *blob,
 
 	/* First pass, scan for size */
 	start = 0;
+	// size 를 알아오기 위해서 dryrun = true
 	size = (unsigned long)unflatten_dt_node(blob, NULL, &start, NULL, NULL, 0, true);
+	// 위 함수에서 void *mem 변수를 리턴하는데, 두번째 인자 NULL이 이변수에 들어간다.
+	// NULL을 0이라고 치면 size를 리턴한다. 
+	// unflatten_dt_alloc 리턴형은 주소인데 dryrun이 false인 경우에만 의미가 있고
+	// 위 경우에서는 size만 늘려나간다.
 	size = ALIGN(size, 4);
 
 	pr_debug("  size is %lx, allocating...\n", size);
@@ -424,7 +466,7 @@ static void __unflatten_device_tree(const void *blob,
 
 	/* Second pass, do actual unflattening */
 	start = 0;
-	unflatten_dt_node(blob, mem, &start, NULL, mynodes, 0, false);
+	unflatten_dt_node(blob, mem, &start, NULL, mynodes, 0, false); // my_nodes : &of_root
 	if (be32_to_cpup(mem + size) != 0xdeadbeef)
 		pr_warning("End of tree marker overwritten: %08x\n",
 			   be32_to_cpup(mem + size));
