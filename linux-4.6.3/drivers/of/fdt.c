@@ -1146,22 +1146,22 @@ void __init early_init_dt_scan_nodes(void)
 	// 부모 노드에 지정(address-cells, size-cells) 자식 노드에 지정 (reg)
 	// ex) reg = < address-cell1, size-cell1, address-cell2, size-cell2, .....>
 	// 
-/*
-		parent {
-			#address-cells = <2>;
-			#size-cells = <1>;
-			child {
-							:
-						reg = <0xC0000000 0x0000 1024>;
-							: 
-			};
-			child {
-							:
-						reg = <0xD0000000 0x0000 1024 0xE0000000 0x0000 2048>;
-							: 
-			};
+	/*
+	parent {
+		#address-cells = <2>;
+		#size-cells = <1>;
+		child {
+				:
+			reg = <0xC0000000 0x0000 1024>;
+				: 
 		};
-*/
+		child {
+				:
+			reg = <0xD0000000 0x0000 1024 0xE0000000 0x0000 2048>;
+				: 
+		};
+	};
+	*/
 
 	of_scan_flat_dt(early_init_dt_scan_root, NULL);
 
