@@ -1134,18 +1134,23 @@ gpio : general purpose.
 
 	unflatten_device_tree(); // fdt를 tree 구조로 만듬
 
-	arm_dt_init_cpu_maps();
+	arm_dt_init_cpu_maps(); //구성된 cpu id 배열을 다시 이전에 구조를 만든 DTB와 비교하여 재구성
 	psci_dt_init();
 	xen_early_init();
 #ifdef CONFIG_SMP
 	if (is_smp()) {
+		//smp 설정여부
 		if (!mdesc->smp_init || !mdesc->smp_init()) {
+			//smp 초기화 여부
 			if (psci_smp_available())
+				//psci 동작 여부
 				smp_set_ops(&psci_smp_ops);
+			//동작시 smp_ops가 psci_smp_ops를 가르키게 한다
 			else if (mdesc->smp)
 				smp_set_ops(mdesc->smp);
+	
 		}
-		smp_init_cpus();
+		smp_init_cpus();//
 		smp_build_mpidr_hash();
 	}
 #endif

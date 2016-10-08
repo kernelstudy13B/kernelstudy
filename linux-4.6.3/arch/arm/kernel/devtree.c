@@ -92,8 +92,10 @@ void __init arm_dt_init_cpu_maps(void)
 	u32 mpidr = is_smp() ? read_cpuid_mpidr() & MPIDR_HWID_BITMASK : 0;
 
 	u32 tmp_map[NR_CPUS] = { [0 ... NR_CPUS-1] = MPIDR_INVALID };
+	//tmp_map의 0번째 인덱스부터 NR_CPUS-1번쨰 인덱스까지 MPIDR_INVALID(0xff00_0000)로 대입.
 	bool bootcpu_valid = false;
 	cpus = of_find_node_by_path("/cpus");
+	// /cpus 노드를 찾음.
 
 	if (!cpus)
 		return;
@@ -102,7 +104,7 @@ void __init arm_dt_init_cpu_maps(void)
 		u32 hwid;
 
 		if (of_node_cmp(cpu->type, "cpu"))
-			continue;
+			continue;//노드 타입이 cpu가 아니면 무시.
 
 		pr_debug(" * %s...\n", cpu->full_name);
 		/*
@@ -110,7 +112,8 @@ void __init arm_dt_init_cpu_maps(void)
 		 * properties is considered invalid to build the
 		 * cpu_logical_map.
 		 */
-		if (of_property_read_u32(cpu, "reg", &hwid)) {
+		if (of_property_read_u32(cpu, "reg", &hwid))
+	       //reg 속성이 없는 경우	{
 			pr_debug(" * %s missing reg property\n",
 				     cpu->full_name);
 			of_node_put(cpu);
@@ -120,9 +123,15 @@ void __init arm_dt_init_cpu_maps(void)
 		/*
 		 * 8 MSBs must be set to 0 in the DT since the reg property
 		 * defines the MPIDR[23:0].
+		 8 MSBs(최상위 비트 8개)는 DT 에서 0으로 세팅되어야한다.
+		 값이 정해져 있으면 함수를 빠져나간다.
+		 cpu 노드안에 reg property가 16진수로 적혀있다.
+
+		 reg property : 레지스터에서 읽어 온 값 또는 주소값
+
 		 */
-		if (hwid & ~MPIDR_HWID_BITMASK) {
-			of_node_put(cpu);
+		if (hwid & ~MPIDR_HWID_BITMASK) {//0xFFFFFF-24비트
+			of_node_put(cpu);//참조 카운트 감소
 			return;
 		}
 
@@ -132,6 +141,8 @@ void __init arm_dt_init_cpu_maps(void)
 		 * duplicates. If any is found just bail out.
 		 * temp values were initialized to UINT_MAX
 		 * to avoid matching valid MPIDR[23:0] values.
+
+		 reg가 중복이 되는지를 체크.
 		 */
 		for (j = 0; j < cpuidx; j++)
 			if (WARN(tmp_map[j] == hwid,
@@ -149,7 +160,7 @@ void __init arm_dt_init_cpu_maps(void)
 		 * logical map built from DT is validated and can be used
 		 * to override the map created in smp_setup_processor_id().
 		 */
-		if (hwid == mpidr) {
+		if (hwid == mpidr) {//DTB에서 읽은 값과 레지스터에서 읽은 값을을 비교해서 현재 부팅되어 진행중인 물리 cpu인 경우 i=0, bootcpu_valid=true로 대입
 			i = 0;
 			bootcpu_valid = true;
 		} else {
@@ -159,25 +170,27 @@ void __init arm_dt_init_cpu_maps(void)
 		if (WARN(cpuidx > nr_cpu_ids, "DT /cpu %u nodes greater than "
 					       "max cores %u, capping them\n",
 					       cpuidx, nr_cpu_ids)) {
+			//DTB 이상
 			cpuidx = nr_cpu_ids;
 			of_node_put(cpu);
 			break;
 		}
 
-		tmp_map[i] = hwid;
+		tmp_map[i] = hwid;//예외처리를 다 끝낸 hwid를 대입.
 
-		if (!found_method)
+		if (!found_method)//최초 루프시에만 유효한 if문.
 			found_method = set_smp_ops_by_method(cpu);
 	}
 
 	/*
 	 * Fallback to an enable-method in the cpus node if nothing found in
 	 * a cpu node.
+	cpu노드에서 아무것도 발견되지 않았을때 cpu 노드에서 사용가능한 대비책.
 	 */
 	if (!found_method)
 		set_smp_ops_by_method(cpus);
 
-	if (!bootcpu_valid) {
+	if (!bootcpu_valid) {//DTB에서 bootcpu가 정해지지 않은경우
 		pr_warn("DT missing boot CPU MPIDR[23:0], fall back to default cpu_logical_map\n");
 		return;
 	}
@@ -186,9 +199,13 @@ void __init arm_dt_init_cpu_maps(void)
 	 * Since the boot CPU node contains proper data, and all nodes have
 	 * a reg property, the DT CPU list can be considered valid and the
 	 * logical map created in smp_setup_processor_id() can be overridden
+
+	 boot cpu 노드는 proper data를 포함하고 모든 노드들은 reg property를 가지므로
+	 DT cpu 리스트는 유효하고 smp~()함수 에서 만들어진 logical map은 덮어씌어진다.
 	 */
 	for (i = 0; i < cpuidx; i++) {
 		set_cpu_possible(i, true);
+		//논리 cpu(코어??)의 possible(인식 가능) 비트를 true로 만듬.
 		cpu_logical_map(i) = tmp_map[i];
 		pr_debug("cpu logical map 0x%x\n", cpu_logical_map(i));
 	}

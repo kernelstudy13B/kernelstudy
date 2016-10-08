@@ -150,7 +150,7 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
 void __init smp_init_cpus(void)
 {
 	if (smp_ops.smp_init_cpus)
-		smp_ops.smp_init_cpus();
+		smp_ops.smp_init_cpus();//이 콜백이 NULL이 아니면 호출한다
 }
 
 int platform_can_secondary_boot(void)

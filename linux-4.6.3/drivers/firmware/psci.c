@@ -572,17 +572,20 @@ static const struct of_device_id const psci_of_match[] __initconst = {
 
 int __init psci_dt_init(void)
 {
+	//SMP 아키텍처에서 psci 기능이 지원되는 경우 해당 초기화 함수를 동작시켜 
+	//각 기능에 해당하는 핸들러 함수 연결
 	struct device_node *np;
 	const struct of_device_id *matched_np;
 	psci_initcall_t init_fn;
 
+	//DT에서 psci_of_match에 있는 디바이스 중 하나라도 일치되는 노드를 찾아 리턴하고 출력인수 matched_up에 psci_of_match에 있는 of_device_id 구조체 엔트리 중 매치된 엔트리 포인터 저장.
 	np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
 
 	if (!np)
 		return -ENODEV;
 
-	init_fn = (psci_initcall_t)matched_np->data;
-	return init_fn(np);
+	init_fn = (psci_initcall_t)matched_np->data;//psci_of_match 각 엔트리에 있는 data 콜백
+	return init_fn(np);//찾은 노드를 초기화 하여 리턴
 }
 
 #ifdef CONFIG_ACPI

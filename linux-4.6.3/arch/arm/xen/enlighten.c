@@ -257,6 +257,7 @@ void __init xen_early_init(void)
 	s = of_get_property(xen_node, "compatible", &len);
 	if (strlen(xen_prefix) + 3  < len &&
 			!strncmp(xen_prefix, s, strlen(xen_prefix)))
+		//xen_prefix를 다음 내용을 찾기 위한 parsing 후, 비교
 		version = s + strlen(xen_prefix);
 	if (version == NULL) {
 		pr_debug("Xen version not found\n");
