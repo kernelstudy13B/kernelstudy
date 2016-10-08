@@ -66,6 +66,9 @@ static inline int set_smp_ops_by_method(struct device_node *node)
  *
  * Updates the cpu possible mask with the number of parsed cpu nodes
  */
+// smp_setup_processor_id 에서 구성했던 logical cpu array와 dtb를 비교하여 재구성하고
+// 특정 SMP 아키텍처의 smp handler가 있는경우에 smp_ops를 설정한다.
+// MPIDR : MultiProcessor Affinity Register
 void __init arm_dt_init_cpu_maps(void)
 {
 	/*
@@ -74,6 +77,15 @@ void __init arm_dt_init_cpu_maps(void)
 	 * contain a list of MPIDR[23:0] values where MPIDR[31:24] must
 	 * read as 0.
 	 */
+	// MPIDR 구조(ARM 제품군에 따라 다르다. 아래는 cortex-A53 기준)
+	// 31 bit : reserved always 1(new format)
+	// 30 bit U : 0-> multiprocessor 1->uniprocessor
+	// 29:25 UNK : reserved
+	// 24 bit : Multi Thread, affinity의 가장 낮은 레벨이 멀티스레딩 타입을 이용되서 
+	// 구현된 논리 코어로 구성되는지 안되는지를 나타낸다.
+	// 0 : 최소 affinity 레벨에서 코어의 성능이 독립적
+	// 1 : 최소 affinity 레벨에서 코어의 성능이 결합적
+	// affinity 
 	struct device_node *cpu, *cpus;
 	int found_method = 0;
 	u32 i, j, cpuidx = 1;

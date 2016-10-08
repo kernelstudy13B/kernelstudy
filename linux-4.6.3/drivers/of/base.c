@@ -1869,7 +1869,8 @@ int of_update_property(struct device_node *np, struct property *newprop)
 
 	return rc;
 }
-
+// aliases_lookup -> list head 
+// 리스트에다가 alias_prop 구조체 추가
 static void of_alias_add(struct alias_prop *ap, struct device_node *np,
 			 int id, const char *stem, int stem_len)
 {
@@ -1892,6 +1893,10 @@ static void of_alias_add(struct alias_prop *ap, struct device_node *np,
  * @dt_alloc:	An allocator that provides a virtual address to memory
  *		for storing the resulting tree
  */
+// chosen node : device tree를 이용해 firmware에서 OS로 데이터를 전달하기 위한 노드
+// alias node : ethernet0 -> eth0 와 같이 줄이기 위해서 alias
+// tree 로 구성한 dt내용중에서 chosen 노드의 stdout 정보를 추가, alias 노드의 속성들을
+// 리스트로 구성
 void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align))
 {
 	struct property *pp;
@@ -1903,19 +1908,20 @@ void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align))
 
 	if (of_chosen) {
 		/* linux,stdout-path and /aliases/stdout are for legacy compatibility */
+		// stdout 관련 속성이 없을수도 있음
 		const char *name = of_get_property(of_chosen, "stdout-path", NULL);
-		if (!name)
+		if (!name)// 못찾았다면 legacy 호환을 위해서 다시 검색
 			name = of_get_property(of_chosen, "linux,stdout-path", NULL);
-		if (IS_ENABLED(CONFIG_PPC) && !name)
+		if (IS_ENABLED(CONFIG_PPC) && !name) // Power PC인데, 이름 못찾았으면
 			name = of_get_property(of_aliases, "stdout", NULL);
-		if (name)
+		if (name) // 찾은 이름을 가지고 stdout node 찾아온다.
 			of_stdout = of_find_node_opts_by_path(name, &of_stdout_options);
 	}
 
 	if (!of_aliases)
 		return;
 
-	for_each_property_of_node(of_aliases, pp) {
+	for_each_property_of_node(of_aliases, pp) { // alias 된 속성들을 순회
 		const char *start = pp->name;
 		const char *end = start + strlen(start);
 		struct device_node *np;
@@ -1936,9 +1942,9 @@ void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align))
 		 * the 'stem' string */
 		while (isdigit(*(end-1)) && end > start)
 			end--;
-		len = end - start;
+		len = end - start; // /abc/def@1000” -> len=9 이런게 있을때, @까지의 길이
 
-		if (kstrtoint(end, 10, &id) < 0)
+		if (kstrtoint(end, 10, &id) < 0) // 숫자를 문자열에서 10진수 정수로 바꿔 id에 저장
 			continue;
 
 		/* Allocate an alias_prop with enough space for the stem */
@@ -1946,8 +1952,8 @@ void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align))
 		if (!ap)
 			continue;
 		memset(ap, 0, sizeof(*ap) + len + 1);
-		ap->alias = start;
-		of_alias_add(ap, np, id, start, len);
+		ap->alias = start; // full name 위 예에서 /dev/def@1000 이 들어가고
+		of_alias_add(ap, np, id, start, len); // ap->stem에 /dev/def@ 가 들어간다.
 	}
 }
 

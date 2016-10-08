@@ -182,12 +182,12 @@ int fdt_next_node(const void *fdt, int offset, int *depth)
 				(*depth)++;
 			break;
 
-		case FDT_END_NODE:
-			if (depth && ((--(*depth)) < 0))
+		case FDT_END_NODE: // NODE (child node의 끝) child가 끝나면 depth-- 
+			if(depth && ((--(*depth)) < 0))
 				return nextoffset;
 			break;
 
-		case FDT_END:
+		case FDT_END: // FDT의 끝
 			if ((nextoffset >= 0)
 			    || ((nextoffset == -FDT_ERR_TRUNCATED) && !depth))
 				return -FDT_ERR_NOTFOUND;

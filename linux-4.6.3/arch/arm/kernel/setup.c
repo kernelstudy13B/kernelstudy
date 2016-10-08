@@ -1132,7 +1132,7 @@ gpio : general purpose.
 	if (mdesc->restart)
 		arm_pm_restart = mdesc->restart;
 
-	unflatten_device_tree();
+	unflatten_device_tree(); // fdt를 tree 구조로 만듬
 
 	arm_dt_init_cpu_maps();
 	psci_dt_init();

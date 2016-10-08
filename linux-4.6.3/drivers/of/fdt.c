@@ -376,7 +376,7 @@ static void * unflatten_dt_node(const void *blob,
 	old_depth = depth;
 	*poffset = fdt_next_node(blob, *poffset, &depth);
 	// 첫 노드의 depth를 찾아옴 
-	// 
+	// poffset 은 dtb에서의 offset(각 태그당 offset) 
 	if (depth < 0)
 		depth = 0;
 	while (*poffset > 0 && depth > old_depth) //depth 가 old_depth 보다 크면 재귀 호출
@@ -1191,11 +1191,13 @@ bool __init early_init_dt_scan(void *params)
  * pointers of the nodes so the normal device-tree walking functions
  * can be used.
  */
+// fdt를 트리로 구성
 void __init unflatten_device_tree(void)
 {
 	__unflatten_device_tree(initial_boot_params, &of_root,
 				early_init_dt_alloc_memory_arch);
-
+	// fdt : tree 형태로 구성되기전의 device tree에 대해 호출 하는 API
+	// of : tree 형태로 구성된 device tree에 대해 호출하는 API
 	/* Get pointer to "/chosen" and "/aliases" nodes for use everywhere */
 	of_alias_scan(early_init_dt_alloc_memory_arch);
 }
