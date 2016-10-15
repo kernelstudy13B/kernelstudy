@@ -633,8 +633,10 @@ struct mpidr_hash mpidr_hash;
  *			  level in order to build a linear index from an
  *			  MPIDR value. Resulting algorithm is a collision
  *			  free hash carried out through shifting and ORing
+MPIDR 값으로부터 linear index를 구성하기 위해 친화력 레벨에서 요구되는 shift들을 미리 계
  */
 static void __init smp_build_mpidr_hash(void)
+	//affinity : 멀티프로세싱을 할때 친화력을 어떤 단위로 유지할지에 대한 레벨
 {
 	u32 i, affinity;
 	u32 fs[3], bits[3], ls, mask = 0;
@@ -642,23 +644,27 @@ static void __init smp_build_mpidr_hash(void)
 	 * Pre-scan the list of MPIDRS and filter out bits that do
 	 * not contribute to affinity levels, ie they never toggle.
 	 */
-	for_each_possible_cpu(i)
+	for_each_possible_cpu(i)//i는 possible state의 cpu 번호
 		mask |= (cpu_logical_map(i) ^ cpu_logical_map(0));
+	//바뀐 비트로 마스킹, 전체 logical cpu id에서 '변화되는 비트'만을 추출해서 mask에 저장.
 	pr_debug("mask of set bits 0x%x\n", mask);
 	/*
 	 * Find and stash the last and first bit set at all affinity levels to
 	 * check how many bits are required to represent them.
+	 얼마나 많은 비트가 레벨들을 나타내기 위해 필요한지 마지막과 처음 비트 세트를 모든 친화력 레벨에서 찾고 저장.
 	 */
 	for (i = 0; i < 3; i++) {
 		affinity = MPIDR_AFFINITY_LEVEL(mask, i);
+		//mask에 대해 각 친화력 레벨별로 값을 추출.
 		/*
 		 * Find the MSB bit and LSB bits position
 		 * to determine how many bits are required
 		 * to express the affinity level.
 		 */
-		ls = fls(affinity);
+		ls = fls(affinity);//fls - 가장 마지막 세트된 비트 번호
+				   //ffs - 가장 처음 세트된 비트 번호
 		fs[i] = affinity ? ffs(affinity) - 1 : 0;
-		bits[i] = ls - fs[i];
+		bits[i] = ls - fs[i];//ls에서 fs를 뺸 값으로 해당 친화력 레벨에서 필요한 hash bit, 이 비트를 이용해서 cpu id 값을 대입하면 친화력 레벨을 알수 있음.
 	}
 	/*
 	 * An index can be created from the MPIDR by isolating the
@@ -669,13 +675,19 @@ static void __init smp_build_mpidr_hash(void)
 	 * hash though not minimal since some levels might contain a number
 	 * of CPUs that is not an exact power of 2 and their bit
 	 * representation might contain holes, eg MPIDR[7:0] = {0x2, 0x80}.
+	 각각 친화력 레벨에서 significant 비트들을 분리하고 24비트 벨류 공간을 압축하기위해 그 비트들을 이동시키면서  MPDIR로부터 만들어짐
+	
 	 */
+	//각 친화력 레벨의 mpidr_hash 비트들이 좌측으로 shift해야 하는 비트 수.
 	mpidr_hash.shift_aff[0] = fs[0];
 	mpidr_hash.shift_aff[1] = MPIDR_LEVEL_BITS + fs[1] - bits[0];
+	//레벨 1에서 레벨 0로 넘어가는 비트 간격
 	mpidr_hash.shift_aff[2] = 2*MPIDR_LEVEL_BITS + fs[2] -
 						(bits[1] + bits[0]);
+	//레벨 2에서 레벨 1로 넘어가는 비트 간격
 	mpidr_hash.mask = mask;
 	mpidr_hash.bits = bits[2] + bits[1] + bits[0];
+	//각 레벨간 간격을 파악했으므로 총 비트의 수를 넘긴다.
 	pr_debug("MPIDR hash: aff0[%u] aff1[%u] aff2[%u] mask[0x%x] bits[%u]\n",
 				mpidr_hash.shift_aff[0],
 				mpidr_hash.shift_aff[1],
@@ -689,6 +701,8 @@ static void __init smp_build_mpidr_hash(void)
 	if (mpidr_hash_size() > 4 * num_possible_cpus())
 		pr_warn("Large number of MPIDR hash buckets detected\n");
 	sync_cache_w(&mpidr_hash);
+	//해시 구조체의 주소위치부터 그 구조체의 해당 사이즈만큼의 영역에 대해
+	//inner ㅐ시 및 outer 캐시를 클린한다.(L2, L3 캐시)
 }
 #endif
 
@@ -1003,20 +1017,31 @@ static inline unsigned long long get_total_mem(void)
  * This function reserves memory area given in "crashkernel=" kernel command
  * line parameter. The memory reserved is used by a dump capture kernel when
  * primary kernel is crashing.
+ crashkernel kernel command line 파라미터에서 주어지는 메모리 구역을 reserve.
  */
 static void __init reserve_crashkernel(void)
 {
+	//커널 패닉 발생시 원인 분석을 위해 덤프 출력할 수 있도록 별도의 capture커널 로드를 하는데 이때 필요한 영역을 reserve
 	unsigned long long crash_size, crash_base;
 	unsigned long long total_mem;
 	int ret;
 
-	total_mem = get_total_mem();
+	total_mem = get_total_mem();//low memory 사이즈 측정.
 	ret = parse_crashkernel(boot_command_line, total_mem,
 				&crash_size, &crash_base);
+
+	/*reserve 하려는 crashkernel의 문법 형태가 세가지가 존재
+	  1. suffix가 있는 경우,단 현 시점에서 suffix는 NULL임.
+	  -따라서 이때의 crash_base를 정의하지 못함??
+	  2. 콜론으로 구분된 range가 주어진  경우
+	  3. 단순히 사이즈가 주어진 경우
+	 */
+	
 	if (ret)
 		return;
 
 	ret = memblock_reserve(crash_base, crash_size);
+	//캡쳐커널(crash 영역)이 사용한 memblock 정의
 	if (ret < 0) {
 		pr_warn("crashkernel reservation failed - memory is in use (0x%lx)\n",
 			(unsigned long)crash_base);
@@ -1031,6 +1056,7 @@ static void __init reserve_crashkernel(void)
 	crashk_res.start = crash_base;
 	crashk_res.end = crash_base + crash_size - 1;
 	insert_resource(&iomem_resource, &crashk_res);
+	//crashk_res 리소스를 iomem 리소스에 추가
 }
 #else
 static inline void reserve_crashkernel(void) {}
@@ -1038,17 +1064,20 @@ static inline void reserve_crashkernel(void) {}
 
 void __init hyp_mode_check(void)
 {
+	//하이퍼바이저에서 부팅된 경우인지 아닌지 메세지를 출력하여 안내
 #ifdef CONFIG_ARM_VIRT_EXT
 	sync_boot_mode();
+	//__boot_cpu_mode 객체 영역에 대해 inner outer 캐시 flush 수행
+	
 
-	if (is_hyp_mode_available()) {
+	if (is_hyp_mode_available()) {//커널 진입시 하이퍼모드 인 경우
 		pr_info("CPU: All CPU(s) started in HYP mode.\n");
 		pr_info("CPU: Virtualization extensions available.\n");
-	} else if (is_hyp_mode_mismatched()) {
+	} else if (is_hyp_mode_mismatched()) {//하이퍼모드 SVC모드 전부 아닌 경우
 		pr_warn("CPU: WARNING: CPU(s) started in wrong/inconsistent modes (primary CPU mode 0x%x)\n",
 			__boot_cpu_mode & MODE_MASK);
 		pr_warn("CPU: This may indicate a broken bootloader or firmware.\n");
-	} else
+	} else//SVC 모드인 경우
 		pr_info("CPU: All CPU(s) started in SVC mode.\n");
 #endif
 }
@@ -1151,29 +1180,30 @@ gpio : general purpose.
 	
 		}
 		smp_init_cpus();//
-		smp_build_mpidr_hash();
+		smp_build_mpidr_hash();//친화력 레벨별로 분석하여 mpidr_hash 구조체 구성하고 이 객체 영역에 대해 inner, outer 캐시 클린 수행
 	}
 #endif
 
 	if (!is_smp())
-		hyp_mode_check();
+		hyp_mode_check();//하이퍼바이저에서의 부팅인지 아닌지 확인
 
 	reserve_crashkernel();
 
 #ifdef CONFIG_MULTI_IRQ_HANDLER
-	handle_arch_irq = mdesc->handle_irq;
+	handle_arch_irq = mdesc->handle_irq;//머신의 irq 핸들러를 사용할수 있도록 함
 #endif
 
-#ifdef CONFIG_VT
+#ifdef CONFIG_VT //virtual terminal
 #if defined(CONFIG_VGA_CONSOLE)
 	conswitchp = &vga_con;
 #elif defined(CONFIG_DUMMY_CONSOLE)
 	conswitchp = &dummy_con;
+	//콘솔로 빠져나오는 데이터(로그 등등)를 어떤식으로 처리할 것인지에 대한 초기화
 #endif
 #endif
 
 	if (mdesc->init_early)
-		mdesc->init_early();
+		mdesc->init_early();//머신 구조체에 담긴 init_early 콜백을 호출하여 초기화 수행.
 }
 
 

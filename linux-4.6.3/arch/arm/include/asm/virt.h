@@ -48,6 +48,7 @@ static inline void sync_boot_mode(void)
 	 * As secondaries write to __boot_cpu_mode with caches disabled, we
 	 * must flush the corresponding cache entries to ensure the visibility
 	 * of their writes.
+	 사용불가한 캐시들과 함께 _boot_cpu_mode에 부차적인 write로서 write의 가시성을 보증하기 위해 해당하는 캐시 엔트리를 flush 해야한다.
 	 */
 	sync_cache_r(&__boot_cpu_mode);
 }

@@ -1072,7 +1072,7 @@ subsys_initcall(crash_notes_memory_init);
 /*
  * This function parses command lines in the format
  *
- *   crashkernel=ramsize-range:size[,...][@offset]
+ *   crashkernel=ramsize-range:size[,...][@offset] - 2번째 케이스
  *
  * The function returns 0 on success and -EINVAL on failure.
  */
@@ -1102,7 +1102,7 @@ static int __init parse_crashkernel_mem(char *cmdline,
 
 		/* if no ':' is here, than we read the end */
 		if (*cur != ':') {
-			end = memparse(cur, &tmp);
+			end = memparse(cur, &tmp);//base address의 주소 위치를 리턴
 			if (cur == tmp) {
 				pr_warn("crashkernel: Memory value expected\n");
 				return -EINVAL;
@@ -1157,7 +1157,7 @@ static int __init parse_crashkernel_mem(char *cmdline,
 /*
  * That function parses "simple" (old) crashkernel command lines like
  *
- *	crashkernel=size[@offset]
+ *	crashkernel=size[@offset] - 3번째 케이스
  *
  * It returns 0 on success and -EINVAL on failure.
  */
@@ -1165,15 +1165,15 @@ static int __init parse_crashkernel_simple(char *cmdline,
 					   unsigned long long *crash_size,
 					   unsigned long long *crash_base)
 {
-	char *cur = cmdline;
+	char *cur = cmdline;//최종 파싱 라인의 포인트가 cur로 들어간다
 
-	*crash_size = memparse(cmdline, &cur);
+	*crash_size = memparse(cmdline, &cur);//(추정)결국 첫번째 케이스의 경우애 size가 존재
 	if (cmdline == cur) {
 		pr_warn("crashkernel: memory value expected\n");
 		return -EINVAL;
 	}
 
-	if (*cur == '@')
+	if (*cur == '@')//3번째 케이스
 		*crash_base = memparse(cur+1, &cur);
 	else if (*cur != ' ' && *cur != '\0') {
 		pr_warn("crashkernel: unrecognized char: %c\n", *cur);
@@ -1235,6 +1235,8 @@ static __init char *get_last_crashkernel(char *cmdline,
 	p = strstr(p, name);
 	while (p) {
 		char *end_p = strchr(p, ' ');
+		//strchr : crushkernel 마지막 공백을 끝으로 결정
+		//문자열이 검색된 경우 그 위치부터 space 문자열 또는 끝까지 루프를 돈다
 		char *q;
 
 		if (!end_p)
@@ -1256,7 +1258,7 @@ static __init char *get_last_crashkernel(char *cmdline,
 			if (!strncmp(q, suffix, strlen(suffix)))
 				ck_cmdline = p;
 		}
-next:
+next://끝부분과 suffix가 같은 경우 넘어옴
 		p = strstr(p+1, name);
 	}
 
@@ -1281,13 +1283,16 @@ static int __init __parse_crashkernel(char *cmdline,
 	*crash_base = 0;
 
 	ck_cmdline = get_last_crashkernel(cmdline, name, suffix);
+	//cmdline = 'crushkernel=',suffix = NULL
 
 	if (!ck_cmdline)
 		return -EINVAL;
 
 	ck_cmdline += strlen(name);
+	//crashkernel= 문자열 다음을 가르키게 한다.
 
-	if (suffix)
+	if (suffix)//suffix가 존재하지 않는 경우엔 ,high ,low를 검색해서 사용
+		//즉 현 시점에선 쓰이지 않는 구문
 		return parse_crashkernel_suffix(ck_cmdline, crash_size,
 				suffix);
 	/*
@@ -1295,17 +1300,20 @@ static int __init __parse_crashkernel(char *cmdline,
 	 * syntax -- if not, it must be the classic syntax
 	 */
 	first_colon = strchr(ck_cmdline, ':');
-	first_space = strchr(ck_cmdline, ' ');
+	first_space = strchr(ck_cmdline, ' ');//콜론과 공백의 위치를 찾음
 	if (first_colon && (!first_space || first_colon < first_space))
+		//콜론 문자열이 space 문자열 이전에 있는 경우 그리고 공백에 콜론보다 뒤에있는 경우, 즉 : 문자로구분된 range가 주어진 경우 ex)"xxx-yyy:64M@0"
 		return parse_crashkernel_mem(ck_cmdline, system_ram,
 				crash_size, crash_base);
 
 	return parse_crashkernel_simple(ck_cmdline, crash_size, crash_base);
+	//첫번째 케이스와 단순히 사이즈가 주어진 경우
 }
 
 /*
  * That function is the entry point for command line parsing and should be
  * called from the arch-specific code.
+ 이 함수는 커맨드 라인 파싱을 위한 껍데기 함수, arch-specific 코드로부터 호출되야한다.
  */
 int __init parse_crashkernel(char *cmdline,
 			     unsigned long long system_ram,
