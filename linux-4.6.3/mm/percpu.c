@@ -1525,9 +1525,13 @@ static void pcpu_dump_alloc_info(const char *lvl,
  */
 int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 				  void *base_addr)
+	//per-cpu 데이터의 firsh chunk를 초기화
+	//first chunk에 대한 관리 정보를 각종 전역변수에 설정하고 out_free: 레이블로 이동하여 임시로 만들었던 정보 ai를 해제한다.
 {
 	static int smap[PERCPU_DYNAMIC_EARLY_SLOTS] __initdata;
 	static int dmap[PERCPU_DYNAMIC_EARLY_SLOTS] __initdata;
+	//PERCPU_DYNAMIC_EARLY_SLOTS : 초기의 map수는 128개, 증가시킬 필요가 있을때
+	//pcpu_extend_area_map()함수를 호출하여 map관리수를늘릴수 있다.
 	size_t dyn_size = ai->dyn_size;
 	size_t size_sum = ai->static_size + ai->reserved_size + dyn_size;
 	struct pcpu_chunk *schunk, *dchunk = NULL;
@@ -1565,45 +1569,59 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 	/* process group information and build config tables accordingly */
 	group_offsets = memblock_virt_alloc(ai->nr_groups *
 					     sizeof(group_offsets[0]), 0);
+	//그룹 수 만큼 group_offsets의 배열을 memblock에 할당하여 offset 데이터 관리
 	group_sizes = memblock_virt_alloc(ai->nr_groups *
 					   sizeof(group_sizes[0]), 0);
 	unit_map = memblock_virt_alloc(nr_cpu_ids * sizeof(unit_map[0]), 0);
+	//nr_cpu_ids(커널에 설정한 최대 지원 cpu),unit map의 배열을 위한 memblock 설정
 	unit_off = memblock_virt_alloc(nr_cpu_ids * sizeof(unit_off[0]), 0);
+	//nr_cpu_ids만큼 unit_off 배열을 memblock에 할당하여 각 unit에 대한 offset 데이터관리
+	//4개 전부 가변배열
 
 	for (cpu = 0; cpu < nr_cpu_ids; cpu++)
 		unit_map[cpu] = UINT_MAX;
+	
 
-	pcpu_low_unit_cpu = NR_CPUS;
+	pcpu_low_unit_cpu = NR_CPUS;//현 커널에서 최대 지원가능한 cpu 갯수
 	pcpu_high_unit_cpu = NR_CPUS;
+	//invalid 값
 
-	for (group = 0, unit = 0; group < ai->nr_groups; group++, unit += i) {
+	for (group = 0, unit = 0; group < ai->nr_groups; group++, unit += i) 
+	{
 		const struct pcpu_group_info *gi = &ai->groups[group];
-
+		//미리 지정되었던 구조체의 필드값을 넣어줌
 		group_offsets[group] = gi->base_offset;
 		group_sizes[group] = gi->nr_units * ai->unit_size;
 
-		for (i = 0; i < gi->nr_units; i++) {
+		for (i = 0; i < gi->nr_units; i++) 
+		{//한 그룹에 여러 유닛이 있을수 있기에 이중반복
 			cpu = gi->cpu_map[i];
-			if (cpu == NR_CPUS)
+			//현재 percpu를 만들고 있는 cpu 번호를 식별하기 위함.
+			if (cpu == NR_CPUS)//사용하지 않는 매핑은 생략(번호로 판단)
 				continue;
 
 			PCPU_SETUP_BUG_ON(cpu >= nr_cpu_ids);
 			PCPU_SETUP_BUG_ON(!cpu_possible(cpu));
 			PCPU_SETUP_BUG_ON(unit_map[cpu] != UINT_MAX);
 
-			unit_map[cpu] = unit + i;
+			unit_map[cpu] = unit + i;//cpu->unit 매핑
 			unit_off[cpu] = gi->base_offset + i * ai->unit_size;
+			//cpu 별 접근시 필요한 offset 설정
+			//정의는 base_offset + 해당 유닛 사이즈만큼 더함
 
 			/* determine low/high unit_cpu */
 			if (pcpu_low_unit_cpu == NR_CPUS ||
 			    unit_off[cpu] < unit_off[pcpu_low_unit_cpu])
-				pcpu_low_unit_cpu = cpu;
+				pcpu_low_unit_cpu = cpu;//번호가 가장 낮은 
+			//pcpu_low_unit_cpu가 NR_CPUS값으로 정해진 뒤 아무런 변화가 없거나(현재 CPU) 가장 최근에 저장했던 cpu의 오프셋을 비교 
 			if (pcpu_high_unit_cpu == NR_CPUS ||
 			    unit_off[cpu] > unit_off[pcpu_high_unit_cpu])
-				pcpu_high_unit_cpu = cpu;
+				pcpu_high_unit_cpu = cpu;//번호가 가장 높은
+			//반대의 경우라면 high값이 들어감
 		}
 	}
-	pcpu_nr_units = unit;
+	pcpu_nr_units = unit;//for문을 통해 나온 unit(총 유닛 갯수)값을 넘겨줌
+	//즉 이것이 percpu의 유닛갯수가 됨
 
 	for_each_possible_cpu(cpu)
 		PCPU_SETUP_BUG_ON(unit_map[cpu] == UINT_MAX);
@@ -1619,6 +1637,7 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 	pcpu_unit_offsets = unit_off;
 
 	/* determine basic parameters */
+	//기본 패러미터 결정
 	pcpu_unit_pages = ai->unit_size >> PAGE_SHIFT;
 	pcpu_unit_size = pcpu_unit_pages << PAGE_SHIFT;
 	pcpu_atom_size = ai->atom_size;
@@ -1628,10 +1647,15 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 	/*
 	 * Allocate chunk slots.  The additional last slot is for
 	 * empty chunks.
+	 //chunk slot들을 할당, 추가되는  마지막 슬롯은 빈 chunk를 위해 존재
 	 */
+	//chunk 리스트를 관리하는 슬롯을 memblock 영역에 할당
 	pcpu_nr_slots = __pcpu_size_to_slot(pcpu_unit_size) + 2;
+	//유닛 사이즈로 slot을 알아온 다음 2를 더한다.
+	//2를 더하는건 마지막 슬롯과 0부터 시작하는 인덱스 때문??
 	pcpu_slot = memblock_virt_alloc(
 			pcpu_nr_slots * sizeof(pcpu_slot[0]), 0);
+	//pcpu_nr_slot 수만큼 list_head 구조체 크기를 memblock에 할당
 	for (i = 0; i < pcpu_nr_slots; i++)
 		INIT_LIST_HEAD(&pcpu_slot[i]);
 
@@ -1641,10 +1665,13 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 	 * in the first chunk.  If reserved_size is not zero, it
 	 * covers static area + reserved area (mostly used for module
 	 * static percpu allocation).
+	 static chunk : reserved_size가 0이면 schunk는퍼스트 청크에서  static area와 동적 할당 부분 더한걸 커버한다. reserved_size가 0이 아니면 static area+reserved area를 커버한다.
 	 */
+	//pcpu chunk 타입인 schunk
 	schunk = memblock_virt_alloc(pcpu_chunk_struct_size, 0);
 	INIT_LIST_HEAD(&schunk->list);
 	INIT_WORK(&schunk->map_extend_work, pcpu_map_extend_workfn);
+	//work queue 초기화
 	schunk->base_addr = base_addr;
 	schunk->map = smap;
 	schunk->map_alloc = ARRAY_SIZE(smap);
@@ -1652,21 +1679,27 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 	bitmap_fill(schunk->populated, pcpu_unit_pages);
 	schunk->nr_populated = pcpu_unit_pages;
 
-	if (ai->reserved_size) {
+	if (ai->reserved_size)
+	//모듈에 올라간다면 static과 reserved 커버
+	{
 		schunk->free_size = ai->reserved_size;
+		//free_size : 청크내 여유공간의 합, 여기서 dyn 관리는 없음.
 		pcpu_reserved_chunk = schunk;
 		pcpu_reserved_chunk_limit = ai->static_size + ai->reserved_size;
 	} else {
-		schunk->free_size = dyn_size;
+		schunk->free_size = dyn_size;//reserved가 없다면 dyn을 커버
 		dyn_size = 0;			/* dynamic area covered */
 	}
+	//shunck -> free_size는 dyn_size와 같다
+	//first chunk를 사용하여 dyn 할당의 매핑 관리가 이루어진다.
 	schunk->contig_hint = schunk->free_size;
-
+	//청크내에서 가장 큰 연속적인 공간의 크기
 	schunk->map[0] = 1;
 	schunk->map[1] = ai->static_size;
 	schunk->map_used = 1;
 	if (schunk->free_size)
 		schunk->map[++schunk->map_used] = ai->static_size + schunk->free_size;
+		//161022
 	schunk->map[schunk->map_used] |= 1;
 
 	/* init dynamic chunk if necessary */
@@ -1792,6 +1825,7 @@ static struct pcpu_alloc_info * __init pcpu_build_alloc_info(
 	/* calculate size_sum and ensure dyn_size is enough for early alloc */
 	size_sum = PFN_ALIGN(static_size + reserved_size +
 			    max_t(size_t, dyn_size, PERCPU_DYNAMIC_EARLY_SIZE));
+	//size_sum은 unit_size와 다를 수 있다.
 	dyn_size = size_sum - static_size - reserved_size;
 
 	/*
@@ -1801,9 +1835,12 @@ static struct pcpu_alloc_info * __init pcpu_build_alloc_info(
 	 * or larger than min_unit_size.
 	 */
 	min_unit_size = max_t(size_t, size_sum, PCPU_MIN_UNIT_SIZE);
+	//최소 unit_size(percpu의 사이즈) 결정
 
-	alloc_size = roundup(min_unit_size, atom_size);
-	upa = alloc_size / min_unit_size;
+	alloc_size = roundup(min_unit_size, atom_size);//4K 단위로 올림
+	//unit_size는페이지 단위로 이루어져 있어야 한다.
+	upa = alloc_size / min_unit_size;//하나의 할당에 들어갈 유닛의 수
+	//할당 하나당 유닛의 수
 	while (alloc_size % upa || (offset_in_page(alloc_size / upa)))
 		upa--;
 	max_upa = upa;
@@ -1819,6 +1856,7 @@ static struct pcpu_alloc_info * __init pcpu_build_alloc_info(
 			    (cpu_distance_fn(cpu, tcpu) > LOCAL_DISTANCE ||
 			     cpu_distance_fn(tcpu, cpu) > LOCAL_DISTANCE)) {
 				group++;
+		
 				nr_groups = max(nr_groups, group + 1);
 				goto next_group;
 			}
@@ -1942,6 +1980,13 @@ int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 				  pcpu_fc_cpu_distance_fn_t cpu_distance_fn,
 				  pcpu_fc_alloc_fn_t alloc_fn,
 				  pcpu_fc_free_fn_t free_fn)
+	//reserved size : 모듈에서 사용하는 모든 DEFINE_PER_CPU 커버할수 있는 크기
+	//dyn_size : first chunk에 dynamic per-cpu 할당을 할 수 있는 크기를 나타냄
+	//atom_size : 원 단위의 크기, 즉 page size
+
+	//이 세개의 패러미터는 아키텍처마다 값이 다름.
+
+	//per-cpu 데이터 영역 할당에 필요한 구성정보를 준비.(메모리 할당이 주가 됨)
 {
 	void *base = (void *)ULONG_MAX;
 	void **areas = NULL;
@@ -1951,30 +1996,40 @@ int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 
 	ai = pcpu_build_alloc_info(reserved_size, dyn_size, atom_size,
 				   cpu_distance_fn);
+	//모든 cpu를 대상으로 구조체의 정보가 채워짐
+	//아키텍처로 정해진 인수값들을 이용하여 ai(pcpu_alloc_info구조체) 값을 구성
 	if (IS_ERR(ai))
 		return PTR_ERR(ai);
 
 	size_sum = ai->static_size + ai->reserved_size + ai->dyn_size;
+	//정해진 사이즈들의 총합
 	areas_size = PFN_ALIGN(ai->nr_groups * sizeof(void *));
+	//PFN_ALIGN : 배열에 필요한 페이지를 구하는 매크로
 
 	areas = memblock_virt_alloc_nopanic(areas_size, 0);
+	//areas_size 만큼 memblock에 할당.
+	//nopanic : 패닉을 무시하면서 할당함.
 	if (!areas) {
 		rc = -ENOMEM;
 		goto out_free;
 	}
 
 	/* allocate, copy and determine base address */
+	//percpu 노드 개수
 	for (group = 0; group < ai->nr_groups; group++) {
 		struct pcpu_group_info *gi = &ai->groups[group];
-		unsigned int cpu = NR_CPUS;
+		unsigned int cpu = NR_CPUS;//지원 가능한 cpu개수
 		void *ptr;
 
 		for (i = 0; i < gi->nr_units && cpu == NR_CPUS; i++)
 			cpu = gi->cpu_map[i];
+		//cpu 번호를 넣는 반복문으로 추정.
 		BUG_ON(cpu == NR_CPUS);
 
 		/* allocate space for the whole group */
+		//전체 그룹에 대한 공간 할당
 		ptr = alloc_fn(cpu, gi->nr_units * ai->unit_size, atom_size);
+		//할당 사이즈만큼 pcpu_dfl_fc_alloc(함수포인터로 수행)을 통해 atom_size로 align하여 메모리 할당
 		if (!ptr) {
 			rc = -ENOMEM;
 			goto out_free_areas;
@@ -1983,40 +2038,52 @@ int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 		kmemleak_free(ptr);
 		areas[group] = ptr;
 
-		base = min(ptr, base);
+		base = min(ptr, base);//그룹이 할당받은 주소 중 가장 작은 주소를 기억
 	}
 
 	/*
 	 * Copy data and free unused parts.  This should happen after all
 	 * allocations are complete; otherwise, we may end up with
 	 * overlapping groups.
+	데이터 카피, 사용되지 않는 부분을 free하는 곳
 	 */
 	for (group = 0; group < ai->nr_groups; group++) {
 		struct pcpu_group_info *gi = &ai->groups[group];
-		void *ptr = areas[group];
+		void *ptr = areas[group];//각 그룹의 영역 할당 주소를 ptr에 담음.
 
 		for (i = 0; i < gi->nr_units; i++, ptr += ai->unit_size) {
 			if (gi->cpu_map[i] == NR_CPUS) {
 				/* unused unit, free whole */
+				//매핑이 되지 않은 유닛에 대한 공간 제거를 위한 조건
+				//즉 CPU가 존재하지 않는 부분에 대해 모두 free
 				free_fn(ptr, ai->unit_size);
+			
 				continue;
 			}
 			/* copy and return the unused part */
 			memcpy(ptr, __per_cpu_load, ai->static_size);
+			//__per_cpu_load에 위치한 percpu static(base address가 있을거라 생각됨)데이터를 해당 유닛에 대응하는 주소에 카피.
 			free_fn(ptr + size_sum, ai->unit_size - size_sum);
+			//나머지 남는 부분에 대한 free
 		}
 	}
 
 	/* base address is now known, determine group base offsets */
-	max_distance = 0;
+	//그룹 base offset을 결정, max_distance를 계산하여 VMALLOC_TOTAL의 75프로를 초과하는지 검사하고 초과하는 경우 경고 출력
+	max_distance = 0;//모든 base_offset 중 가장 큰 주소를 담고 유닛사이즈만큼 더함.
 	for (group = 0; group < ai->nr_groups; group++) {
 		ai->groups[group].base_offset = areas[group] - base;
 		max_distance = max_t(size_t, max_distance,
 				     ai->groups[group].base_offset);
+		//비교를 하면서 큰값을 넣고 누적이 됨,
+		//최종값은 마지막 유닛(CPU 하나당)의 베이스 주소
 	}
 	max_distance += ai->unit_size;
+	//할당한 제일 마지막의 주소를 구함. 
+	//max_distance : 주소가 아닌 크기를 의미하므로 유닛사이즈의 값을 더함
 
 	/* warn if maximum distance is further than 75% of vmalloc space */
+	//75프로가 넘는지에 대한 경고 판별
 	if (max_distance > VMALLOC_TOTAL * 3 / 4) {
 		pr_warn("max_distance=0x%zx too large for vmalloc space 0x%lx\n",
 			max_distance, VMALLOC_TOTAL);
@@ -2187,8 +2254,12 @@ static void __init pcpu_dfl_fc_free(void *ptr, size_t size)
 	memblock_free_early(__pa(ptr), size);
 }
 
-void __init setup_per_cpu_areas(void)
+void __init setup_per_cpu_areas(void)//smp generic
 {
+	//per_cpu : 하나의 percpu 데이터는 각 possible cpu 수만큼(코어) 별도의 분리된 공간 제공각 cpu는 전용이 per-cpu 공간으로 접근하여 사용dd
+	//데이터를 per-cpu 영역으로 만들어 각 CPU별로 사본을 갖게하고 SMP 환경에서 자신의 CPU와 관련된 데이터만 액세스 할 ㅕㅇ우 동기화에 대해 고려할 것이 줄어든다.
+
+
 	unsigned long delta;
 	unsigned int cpu;
 	int rc;
@@ -2196,6 +2267,8 @@ void __init setup_per_cpu_areas(void)
 	/*
 	 * Always reserve area for module percpu variables.  That's
 	 * what the legacy allocator did.
+	 모듈 percpu 변수들을 위해 항상 공간을 남겨둔다. legacy allocator의 역할이었다
+	percpu 데이터를 사용할수 있도록 준비
 	 */
 	rc = pcpu_embed_first_chunk(PERCPU_MODULE_RESERVE,
 				    PERCPU_DYNAMIC_RESERVE, PAGE_SIZE, NULL,
@@ -2204,6 +2277,7 @@ void __init setup_per_cpu_areas(void)
 		panic("Failed to initialize percpu areas.");
 
 	delta = (unsigned long)pcpu_base_addr - (unsigned long)__per_cpu_start;
+	//베이스 주소와 시작주소를 뺀 값. offset과 비슷한 개념
 	for_each_possible_cpu(cpu)
 		__per_cpu_offset[cpu] = delta + pcpu_unit_offsets[cpu];
 }

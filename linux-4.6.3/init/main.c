@@ -357,16 +357,24 @@ static inline void smp_prepare_cpus(unsigned int maxcpus) { }
  * We also need to store the touched command line since the parameter
  * parsing is performed in place, and we should allow a component to
  * store reference of name/value for future reference.
+ 후에 사용할지도 모르기 떄문에 untouched commandline을 저장해야한다
+ 또한 패러미터 파싱이 될수도 있기 때문에 touched commandline도 저장해야한다.
+ 그리고 이런 구성요소들이 후에 사용할지도 모르기 때문에 이름과 값의 참조값을 저장하도록 허용해야한다.
+ untouched line : command_line에서 들어오는 매개변수중 변화가 없는 커맨드 라인
  */
 static void __init setup_command_line(char *command_line)
 {
 	saved_command_line =
 		memblock_virt_alloc(strlen(boot_command_line) + 1, 0);
+	//boot_command_line 복사, 첫번쨰 strcpy
 	initcall_command_line =
 		memblock_virt_alloc(strlen(boot_command_line) + 1, 0);
+	//boot_command_line 크기만큼 공간만 확보, per-initcall 파라메터 파싱을 위해 사용
 	static_command_line = memblock_virt_alloc(strlen(command_line) + 1, 0);
+	//인수로 받아온 command_line 보사(두번쨰 strcpy), 파라미터 파싱용으로 사용, 변경가능
 	strcpy(saved_command_line, boot_command_line);
 	strcpy(static_command_line, command_line);
+	//command_line : 이를 사용하기 위해 참조나 복사의 방식을 거쳐 touched 됨. 따라서 이 변수가 touched line일것.
 }
 
 /*

@@ -178,6 +178,7 @@ static inline void * __init memblock_virt_alloc_nopanic(
 						    BOOTMEM_LOW_LIMIT,
 						    BOOTMEM_ALLOC_ACCESSIBLE,
 						    NUMA_NO_NODE);
+
 }
 
 #ifndef ARCH_LOW_ADDRESS_LIMIT

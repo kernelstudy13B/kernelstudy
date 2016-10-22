@@ -515,6 +515,8 @@ static inline void mm_init_cpumask(struct mm_struct *mm)
 {
 #ifdef CONFIG_CPUMASK_OFFSTACK
 	mm->cpu_vm_mask_var = &mm->cpumask_allocation;
+	//CPU 수가 많은 경우 CPU 수 만큼 비트맵으로 처리되는 cpumask 크기가 커진다.
+	//이런 처리를 스택을 사용하지 않도록 별도의 메모리를 할당받아 stack overflow를 피함
 #endif
 	cpumask_clear(mm->cpu_vm_mask_var);
 }

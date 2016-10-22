@@ -554,7 +554,11 @@ EXPORT_SYMBOL(nr_cpu_ids);
 /* An arch may set nr_cpu_ids earlier if needed, so this would be redundant */
 void __init setup_nr_cpu_ids(void)
 {
+	//일반적인 머신에서 NR_CPUS와 nr_cpu_ids값은 동일하지만
+	//NR_CPUS가 수천으로 설정된 시스템에서는 실제 운영가능한 최고 CPU 번호를 알아내여 저장 할 필요가 있다
 	nr_cpu_ids = find_last_bit(cpumask_bits(cpu_possible_mask),NR_CPUS) + 1;
+	//+1은 cpu가 0번부터 시작하기 떄문
+	//아키텍처에 따라 미리 정해져있을수 있으므로 예비과정이라고 생각됨
 }
 
 void __weak smp_announce(void)

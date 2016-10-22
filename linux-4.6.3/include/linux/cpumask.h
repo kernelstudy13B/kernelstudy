@@ -344,6 +344,7 @@ static inline void cpumask_setall(struct cpumask *dstp)
 static inline void cpumask_clear(struct cpumask *dstp)
 {
 	bitmap_zero(cpumask_bits(dstp), nr_cpumask_bits);
+	//cpu mask 비트맵을 cpu수만큼 clear
 }
 
 /**
