@@ -31,7 +31,7 @@
 #include "smpboot.h"
 
 /**
- * cpuhp_cpu_state - Per cpu hotplug state storage
+ * cpuhp_cpu_state - Per cpu hotplug state storage //percpu 핫플러그 상태일떄의 구조체
  * @state:	The current cpu state
  * @target:	The target state
  * @thread:	Pointer to the hotplug thread
@@ -46,9 +46,9 @@ struct cpuhp_cpu_state {
 	enum cpuhp_state	state;
 	enum cpuhp_state	target;
 #ifdef CONFIG_SMP
-	struct task_struct	*thread;
+	struct task_struct	*thread;//핫프러그 스레드를 가리키는 포인터
 	bool			should_run;
-	bool			rollback;
+	bool			rollback;//롤백 실행 유무에 따른 boolean 필드
 	enum cpuhp_state	cb_state;
 	int			(*cb)(unsigned int cpu);
 	int			result;
@@ -1731,5 +1731,8 @@ void __init boot_cpu_init(void)
  */
 void __init boot_cpu_state_init(void)
 {
+	//부팅하는 cpu의 상태를 초기화...
+	//CPUHP_ONLINE을 통해 online 상태로 초기화한다
 	per_cpu_ptr(&cpuhp_state, smp_processor_id())->state = CPUHP_ONLINE;
+	//cpuhp_state : percpu의 변수, 여기서 cpu별로 메모리변수들이 선언 되어 있다. 그리고 현재의 프로세서 id에 대해 state 필드의 상태를 바꾸는 것
 }

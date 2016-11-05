@@ -4187,6 +4187,7 @@ static int node_load[MAX_NUMNODES];
  * on them otherwise.
  * It returns -1 if no node is found.
  */
+//주어진 노드의 폴백 리스트에서 나타나야할 next node가 어떤 노드인지 결정하기 위한 많은 요인들이 있다. 그 노드는 @node의 폴백 리스트에서 나타나지 않을것이며 distance array에 ㄸ라 가장 가까운 노드가 되어야 한다.
 static int find_next_best_node(int node, nodemask_t *used_node_mask)
 {
 	int n, val;
@@ -4319,13 +4320,18 @@ static int default_zonelist_order(void)
  */
 static int default_zonelist_order(void)
 {
-	return ZONELIST_ORDER_ZONE;
+	return ZONELIST_ORDER_ZONE;//32비트 ARM인 경우 ZONELIST_ORDER_ZONE
 }
 #endif /* CONFIG_64BIT */
 
 static void set_zonelist_order(void)
 {
-	if (user_zonelist_order == ZONELIST_ORDER_DEFAULT)
+	if (user_zonelist_order == ZONELIST_ORDER_DEFAULT)//order가 디폴트라고 설정
+	//32비트의 경우 메모리가 부족해서 ZONELIST_ORDER_ZONE을 사용
+
+	//node order : best node(해당 cpu에 있어 조건이 좋은 노드)->zone 타입 역순으로 zonelist를 구성. 64비트는 메모리가 충분하므로 node order를 사용.
+
+	//zone order : zone 타입 역순(ZONE_HIGHMEM먼저 시작하는것이 역순) -> best node 순으로 zonelist 구성, ZONE_NORMAL 영역에 대해 충분한 free영역을 확보해야 하므로 메모리가 적은 32비트에서는 zone order가 디폴트.
 		current_zonelist_order = default_zonelist_order();
 	else
 		current_zonelist_order = user_zonelist_order;
@@ -4340,6 +4346,8 @@ static void build_zonelists(pg_data_t *pgdat)
 	unsigned int order = current_zonelist_order;
 
 	/* initialize zonelists */
+	//MAX_ZONELISTS : numa시스템은 2, uma시스템은 1,
+	//zonelist[0]은 전체 노드를 대상으로 만들어지지만 zonelists은 현제 노드만을 대상으로 만들어진다. [1]은 오직 numa에서만 존재.
 	for (i = 0; i < MAX_ZONELISTS; i++) {
 		zonelist = pgdat->node_zonelists + i;
 		zonelist->_zonerefs[0].zone = NULL;
@@ -4347,10 +4355,10 @@ static void build_zonelists(pg_data_t *pgdat)
 	}
 
 	/* NUMA-aware ordering of nodes */
-	local_node = pgdat->node_id;
-	load = nr_online_nodes;
-	prev_node = local_node;
-	nodes_clear(used_mask);
+	local_node = pgdat->node_id; //요청 노드 id
+	load = nr_online_nodes;//운용중인 노드
+	prev_node = local_node;//이전 노드에 현재 요청 노드를 초기값으로 대입
+	nodes_clear(used_mask);//노드 비트맵 클리어
 
 	memset(node_order, 0, sizeof(node_order));
 	i = 0;
@@ -4360,25 +4368,30 @@ static void build_zonelists(pg_data_t *pgdat)
 		 * We don't want to pressure a particular node.
 		 * So adding penalty to the first node in same
 		 * distance group to make it round-robin.
+		 특정 노드를 pressure 할것을 원치 않으므로 라운드로빈방식으로 하기위해 같은 방향의 그룹내 first node에 페널티 부과
 		 */
 		if (node_distance(local_node, node) !=
 		    node_distance(local_node, prev_node))
 			node_load[node] = load;
 
-		prev_node = node;
+		//현재 노드와 알아온 인접 노드의 거리가 다르다면 (이전 노드와 거리가 다르다면) node_load[node]에 load값을 대입
+
+		prev_node = node;//이전 노드에 현재 노드 id 대입
 		load--;
 		if (order == ZONELIST_ORDER_NODE)
-			build_zonelists_in_node_order(pgdat, node);
+			build_zonelists_in_node_order(pgdat, node);//0번 리스트
+		//order가 노드 순이면 zonelists를 order 순으로 구성.
 		else
 			node_order[i++] = node;	/* remember order */
 	}
 
 	if (order == ZONELIST_ORDER_ZONE) {
 		/* calculate node order -- i.e., DMA last! */
-		build_zonelists_in_zone_order(pgdat, i);
+		build_zonelists_in_zone_order(pgdat, i);//본 함수는 order에 따른 분기를 제공하고 실제로는 이 함수에서 zonelist를 build
+		
 	}
 
-	build_thisnode_zonelists(pgdat);
+	build_thisnode_zonelists(pgdat);//1번(현재노드) zonelist?
 }
 
 #ifdef CONFIG_HAVE_MEMORYLESS_NODES
@@ -4465,27 +4478,29 @@ static void setup_zone_pageset(struct zone *zone);
 /*
  * Global mutex to protect against size modification of zonelists
  * as well as to serialize pageset setup for the new populated zone.
+ 하지만 부팅중엔 부팅cpu만 있으므로 mutex가 필요 없음
  */
 DEFINE_MUTEX(zonelists_mutex);
 
 /* return values int ....just for stop_machine() */
 static int __build_all_zonelists(void *data)
 {
+	//모든 노드에 대해 zonelists를 구성
 	int nid;
 	int cpu;
-	pg_data_t *self = data;
+	pg_data_t *self = data;//최초 이 함수를 호출 시 null이 data 인수로 주어짐
 
 #ifdef CONFIG_NUMA
-	memset(node_load, 0, sizeof(node_load));
+	memset(node_load, 0, sizeof(node_load));//전역 node_load 배열을 0으로 초기화
 #endif
 
 	if (self && !node_online(self->node_id)) {
 		build_zonelists(self);
-	}
+	}//처음 self는 NULL, 즉 부팅과정을 위한 부분이  아님
 
 	for_each_online_node(nid) {
 		pg_data_t *pgdat = NODE_DATA(nid);
-
+		//이제 NULL상태가 아닌 데이터가 들어감
 		build_zonelists(pgdat);
 	}
 
@@ -4501,9 +4516,15 @@ static int __build_all_zonelists(void *data)
 	 * F.e. the percpu allocator needs the page allocator which
 	 * needs the percpu allocator in order to allocate its pagesets
 	 * (a chicken-egg dilemma).
+	 
+	 부트스트래핑 프로세서를 위해 사용될 boot_pagesets 초기화, 각각의 존을 위한 real pagesets은 per cpu 할당자가 사용가능하면 그 후에 할당이 된다.
+
+	 boot_pagesets pageset들이 특정 cpu에서 할당자를 초기화해야 하므로 이미 부팅되있다면 부트스트래핑 오프라인 cpu을 위해 사용된다. 
+
 	 */
 	for_each_possible_cpu(cpu) {
 		setup_pageset(&per_cpu(boot_pageset, cpu), 0);
+		//possible cpu 루프를 돌면서 pageset 정의
 
 #ifdef CONFIG_HAVE_MEMORYLESS_NODES
 		/*
@@ -4513,6 +4534,8 @@ static int __build_all_zonelists(void *data)
 		 * boot, only the boot cpu should be on-line;  we'll init the
 		 * secondary cpus' numa_mem as they come on-line.  During
 		 * node/memory hotplug, we'll fixup all on-line cpus.
+
+		각 노드들을 위한  로컬메모리 노드(generic zonelist안에 있는 first zone 노드),부팅 동안 오직 boot cpu만이 온라인상태일것이다. boot cpu 이외에는 그 이후에 온라인 상태가 될떄 초기화를 할것이다.
 		 */
 		if (cpu_online(cpu))
 			set_cpu_numa_mem(cpu, local_memory_node(cpu_to_node(cpu)));
@@ -4523,11 +4546,11 @@ static int __build_all_zonelists(void *data)
 }
 
 static noinline void __init
-build_all_zonelists_init(void)
+build_all_zonelists_init(void) //noinline : 인라인을 강제로 금지
 {
-	__build_all_zonelists(NULL);
-	mminit_verify_zonelist();
-	cpuset_init_current_mems_allowed();
+	__build_all_zonelists(NULL);//zonelist 구성
+	mminit_verify_zonelist();//디버그 출력
+	cpuset_init_current_mems_allowed();//현재 cpu에 대해 모든 노드의 메모리 접근 가능하게 함
 }
 
 /*
@@ -4538,15 +4561,20 @@ build_all_zonelists_init(void)
  * [we're only called with non-NULL zone through __meminit paths] and
  * (2) call of __init annotated helper build_all_zonelists_init
  * [protected by SYSTEM_BOOTING].
+
+ 이 함수가 부팅시 호출이 되면 전체 노드에 대해 'zonelist'를 구성하고 현재 cpu(현 소스에서 접근 되는 cpu)에 대해 모든 노드의 메모리를 액세스할수 있도록 설정.
+
+ 핸들러에 의해 호출(핫플러그 메모리)되는 경우 전체 cpu를 멈추고 zone에 대한 boot pageset테이블 구성 및 전체 노드에 대해 zonelist를 다시 구성.
  */
 void __ref build_all_zonelists(pg_data_t *pgdat, struct zone *zone)
+	//초기 매개변수 pgdat, zone은 모두 NULL
 {
 	set_zonelist_order();
 
 	if (system_state == SYSTEM_BOOTING) {
 		build_all_zonelists_init();
 	} else {
-#ifdef CONFIG_MEMORY_HOTPLUG
+#ifdef CONFIG_MEMORY_HOTPLUG //즉 부팅이 된 상태
 		if (zone)
 			setup_zone_pageset(zone);
 #endif

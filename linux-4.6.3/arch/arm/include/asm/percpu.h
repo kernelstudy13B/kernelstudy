@@ -23,7 +23,7 @@
 #if defined(CONFIG_SMP) && !defined(CONFIG_CPU_V6)
 static inline void set_my_cpu_offset(unsigned long off)
 {
-	/* Set TPIDRPRW */
+	/* Set TPIDRPRW *///TPIDRPRW - 레지스터
 	asm volatile("mcr p15, 0, %0, c13, c0, 4" : : "r" (off) : "memory");
 }
 

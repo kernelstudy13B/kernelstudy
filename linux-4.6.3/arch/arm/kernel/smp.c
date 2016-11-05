@@ -431,6 +431,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
 
 void __init smp_prepare_boot_cpu(void)
 {
+	//현재 cpu에 대한 per-cpu offset 값을 저장하여 per-cpu 변수에 대한 액세스를 가능하게 함.
 	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
 }
 
