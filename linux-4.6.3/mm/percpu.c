@@ -363,7 +363,7 @@ static int pcpu_count_occupied_pages(struct pcpu_chunk *chunk, int i)
 static void pcpu_chunk_relocate(struct pcpu_chunk *chunk, int oslot)
 {
 	int nslot = pcpu_chunk_slot(chunk);
-
+	//현재 chunk가 어느 슬롯에 할당될지 정하는 함수
 	if (chunk != pcpu_reserved_chunk && oslot != nslot) {
 		if (oslot < nslot)
 			list_move(&chunk->list, &pcpu_slot[nslot]);
@@ -1588,6 +1588,7 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 
 	for (group = 0, unit = 0; group < ai->nr_groups; group++, unit += i) 
 	{
+		//그룹당 cpu 개수가 다를 수 있음
 		const struct pcpu_group_info *gi = &ai->groups[group];
 		//미리 지정되었던 구조체의 필드값을 넣어줌
 		group_offsets[group] = gi->base_offset;
@@ -1649,10 +1650,19 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 	 * empty chunks.
 	 //chunk slot들을 할당, 추가되는  마지막 슬롯은 빈 chunk를 위해 존재
 	 */
-	//chunk 리스트를 관리하는 슬롯을 memblock 영역에 할당
+	
+
+	//unit : 한 cpu의 per_cpu 공간의 메모리
+	//group : 노드와 같은 개념, unit이 복수개 모이면 group, unit은 노드마다 개수가 다를 수 있다.
+	//chunk : 모든 unit, 즉 모든 group이 모여서 chunk를 이루고 커널 초기화 과정에서 만들어 지는것이 first chunk이다. NUMA일 경우 first chunk 메모리 할당 위치가 각 노드마다 지정되어있다.
+
+
+
+	//처음 부팅단계에 만들어지는게 first chunk, unit
+	//chunk 리스트를 관리하는 슬롯을 memblock 영역에 할당(각 노드마다 있는 first chunk의 모음을 slot(배열?)로 볼수 있도록 함.
 	pcpu_nr_slots = __pcpu_size_to_slot(pcpu_unit_size) + 2;
 	//유닛 사이즈로 slot을 알아온 다음 2를 더한다.
-	//2를 더하는건 마지막 슬롯과 0부터 시작하는 인덱스 때문??
+	//2를 더하는건 마지막 슬롯(빈 chunk)과 0부터 시작하는 인덱스 때문??
 	pcpu_slot = memblock_virt_alloc(
 			pcpu_nr_slots * sizeof(pcpu_slot[0]), 0);
 	//pcpu_nr_slot 수만큼 list_head 구조체 크기를 memblock에 할당
@@ -1680,7 +1690,7 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 	schunk->nr_populated = pcpu_unit_pages;
 
 	if (ai->reserved_size)
-	//모듈에 올라간다면 static과 reserved 커버
+	//모듈에 올라간다면 static과 reserved 커버, ai->reserved_size는 모듈을 위한 기본예약크기
 	{
 		schunk->free_size = ai->reserved_size;
 		//free_size : 청크내 여유공간의 합, 여기서 dyn 관리는 없음.
@@ -1694,15 +1704,17 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 	//first chunk를 사용하여 dyn 할당의 매핑 관리가 이루어진다.
 	schunk->contig_hint = schunk->free_size;
 	//청크내에서 가장 큰 연속적인 공간의 크기
-	schunk->map[0] = 1;
-	schunk->map[1] = ai->static_size;
-	schunk->map_used = 1;
+	schunk->map[0] = 1;//모든 chunk의 map[0]은 1로 정의
+	schunk->map[1] = ai->static_size;//사용 불가능한 공간의 사이즈
+	//인덱스 0,1
+	schunk->map_used = 1;//청크 매핑의 카운트
 	if (schunk->free_size)
 		schunk->map[++schunk->map_used] = ai->static_size + schunk->free_size;
-		//161022
-	schunk->map[schunk->map_used] |= 1;
+	
+	schunk->map[schunk->map_used] |= 1;//or연산으로 in-use 표시
 
 	/* init dynamic chunk if necessary */
+	//no module인 경우 이미 static chunk에 포함되어 있으므로 필수적인 조건이 아닌 chunk
 	if (dyn_size) {
 		dchunk = memblock_virt_alloc(pcpu_chunk_struct_size, 0);
 		INIT_LIST_HEAD(&dchunk->list);
@@ -1722,11 +1734,15 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 	}
 
 	/* link the first chunk in */
-	pcpu_first_chunk = dchunk ?: schunk;
+	pcpu_first_chunk = dchunk ? : schunk;
+	//dchunk를 first chunk로 하되 없다면 schunk로 한다.
 	pcpu_nr_empty_pop_pages +=
 		pcpu_count_occupied_pages(pcpu_first_chunk, 1);
+		//빈 populate page가 담김. ~occupied~는 first chunk에서 1번 인덱스에서 사용되는 페이지의 갯수를 가져옴.
+		//공간은 할당되어있는 first chunk의 부분에서 페이지수를 구해오고 그 갯수를 비어있다고 간주하여 합산한다. 즉 first chunk setup을 위한 공간을 나타내는 변수
 	pcpu_chunk_relocate(pcpu_first_chunk, -1);
-
+	//first chunk의 free_size를  슬롯번호로 알아와서(몇번 슬롯번호로 넣어야하는지를 알기위함) first chunk에 포함시킨다.
+	
 	/* we're done */
 	pcpu_base_addr = base_addr;
 	return 0;
@@ -1980,11 +1996,12 @@ int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 				  pcpu_fc_cpu_distance_fn_t cpu_distance_fn,
 				  pcpu_fc_alloc_fn_t alloc_fn,
 				  pcpu_fc_free_fn_t free_fn)
-	//reserved size : 모듈에서 사용하는 모든 DEFINE_PER_CPU 커버할수 있는 크기
-	//dyn_size : first chunk에 dynamic per-cpu 할당을 할 수 있는 크기를 나타냄
-	//atom_size : 원 단위의 크기, 즉 page size
+	//reserved size : 모듈에서 사용하는 모든 DEFINE_PER_CPU 커버할수 있는 크기a
+	//(CONFIG_MODULE이 설정되어있으면 8K 그렇지 않으면 0)
+	//dyn_size : first chunk에 dynamic per-cpu 할당을 할 수 있는 크기를 나타냄(20K)
+	//atom_size : 원 단위의 크기, 즉 page size(4K)
 
-	//이 세개의 패러미터는 아키텍처마다 값이 다름.
+	//이 세개의 패러미터는 아키텍처마다 값이 다름.현재 아키텍처는 ARM 32비트
 
 	//per-cpu 데이터 영역 할당에 필요한 구성정보를 준비.(메모리 할당이 주가 됨)
 {
@@ -2087,6 +2104,7 @@ int __init pcpu_embed_first_chunk(size_t reserved_size, size_t dyn_size,
 	if (max_distance > VMALLOC_TOTAL * 3 / 4) {
 		pr_warn("max_distance=0x%zx too large for vmalloc space 0x%lx\n",
 			max_distance, VMALLOC_TOTAL);
+		//3/4이 넘으면 warning 표시후 percpu 초기화
 #ifdef CONFIG_NEED_PER_CPU_PAGE_FIRST_CHUNK
 		/* and fail if we have fallback */
 		rc = -EINVAL;
@@ -2256,8 +2274,8 @@ static void __init pcpu_dfl_fc_free(void *ptr, size_t size)
 
 void __init setup_per_cpu_areas(void)//smp generic
 {
-	//per_cpu : 하나의 percpu 데이터는 각 possible cpu 수만큼(코어) 별도의 분리된 공간 제공각 cpu는 전용이 per-cpu 공간으로 접근하여 사용dd
-	//데이터를 per-cpu 영역으로 만들어 각 CPU별로 사본을 갖게하고 SMP 환경에서 자신의 CPU와 관련된 데이터만 액세스 할 ㅕㅇ우 동기화에 대해 고려할 것이 줄어든다.
+	//per_cpu : 하나의 percpu 데이터는 각 possible cpu 수만큼(코어) 별도의 분리된 공간 제공각 cpu는 전용이 per-cpu 공간으로 접근하여 사용
+	//데이터를 per-cpu 영역으로 만들어 각 CPU별로 사본을 갖게하고 SMP 환경에서 자신의 CPU와 관련된 데이터만 액세스 할  동기화에 대해 고려할 것이 줄어든다.
 
 
 	unsigned long delta;
@@ -2287,16 +2305,22 @@ void __init setup_per_cpu_areas(void)//smp generic
 
 /*
  * UP percpu area setup.
- *
+ * --> ARM은 up-generic 또는 smp-generic 코드를 사용(현재는 up-generic), up 시스템에서 동작하는 공통 setup_per_cpu_areas 구현
  * UP always uses km-based percpu allocator with identity mapping.
  * Static percpu variables are indistinguishable from the usual static
  * variables and don't require any special preparation.
+
+ up-generic은 상태 매핑과 함꼐 km 기반 percpu allocator 사용, static percpu 변수는 통상적인 static 변수로부터 불분명하고 어떤 특별한 준비를 요구하지 않는다.
  */
 void __init setup_per_cpu_areas(void)
 {
+	//UP(unit process) percpu 설치
+	//percpu : 각 possible cpu수 만큼 별도 분리된 공간 제공, 각 cpu는 전용의 per-cpu공간으로 접근하여 사용
 	const size_t unit_size =
 		roundup_pow_of_two(max_t(size_t, PCPU_MIN_UNIT_SIZE,
 					 PERCPU_DYNAMIC_RESERVE));
+	//
+	//
 	struct pcpu_alloc_info *ai;
 	void *fc;
 
