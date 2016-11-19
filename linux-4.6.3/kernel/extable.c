@@ -41,6 +41,9 @@ u32 __initdata __visible main_extable_sort_needed = 1;
 /* Sort the kernel's built-in exception table */
 void __init sort_main_extable(void)
 {
+	// struct exception_table_entry { insn, fixup }
+	// 인터럽트 벡터는 순서에 맞게 잘 있는 상태고 배열의 요소들이 insn 기준으로
+	// 정렬이 안되어있는 경우 정렬하는거같음
 	if (main_extable_sort_needed && __stop___ex_table > __start___ex_table) {
 		pr_notice("Sorting __ex_table...\n");
 		sort_extable(__start___ex_table, __stop___ex_table);

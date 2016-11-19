@@ -577,14 +577,14 @@ asmlinkage __visible void __init start_kernel(void) //called by head.S
 	/*
 	 * These use large bootmem allocations and must precede
 	 * kmem_cache_init()
-	 큰 bootmem 할당 사용, 
+	 큰 bootmem 할당 사용, buddy/slab 사용하기전에 할당해줘야함
 	 */
 	setup_log_buf(0);
 	pidhash_init();
 	vfs_caches_init_early();
-	sort_main_extable();
-	trap_init();
-	mm_init();
+	sort_main_extable(); //main exception table이 정렬이 필요하면 정렬
+	trap_init(); // arm은 내용이 없음
+	mm_init();  
 
 	/*
 	 * Set up the scheduler prior starting any interrupts (such as the

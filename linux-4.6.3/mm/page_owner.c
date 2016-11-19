@@ -39,8 +39,13 @@ static void init_page_owner(void)
 	if (page_owner_disabled)
 		return;
 
-	static_branch_enable(&page_owner_inited);
-	init_early_allocated_pages();
+	static_branch_enable(&page_owner_inited); 
+	// page_owner_inited 변수 false인게 디폴트다라고 선언했고
+	// static branch enable : static key를 이용해서 브랜치 최적화를 동적으로 하는데
+	// static_branch_enable 함수를 이용해 인자가 true가 기본이 되게 동적으로 변경
+	// 내부적으로 static_key_slow_inc 로 1증가 (0->1)
+	// static_key_slow_dec 함수로 1 감소(disable : 1->0)
+	init_early_allocated_pages(); // 161123 여기해야함
 }
 
 struct page_ext_operations page_owner_ops = {

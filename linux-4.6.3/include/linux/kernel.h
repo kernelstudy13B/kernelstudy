@@ -50,7 +50,8 @@
 #define __ALIGN_MASK(x, mask)	__ALIGN_KERNEL_MASK((x), (mask))
 #define PTR_ALIGN(p, a)		((typeof(p))ALIGN((unsigned long)(p), (a)))
 #define IS_ALIGNED(x, a)		(((x) & ((typeof(x))(a) - 1)) == 0)
-
+// a = 0x1000 , a-1 = 0xfff 인데 x가 a단위로 align 되있다면
+// a-1 & x 는 0이 나온다. 정렬이 안되있다면 12비트 안에 1이 있겠지요
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
 
 /*

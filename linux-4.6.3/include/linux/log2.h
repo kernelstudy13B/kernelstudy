@@ -164,6 +164,8 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
  * round the given value up to the nearest power of two
  * - the result is undefined when n == 0
  * - this can be used to initialise global variables from constant data
+ * ilogn((n) - 1) + 1 : (n) - 1의 이유 : 2 -> 2, 4 -> 4가 되게 하기 위해서
+ * #define max(a, b) (((a) > (b)) ? (a) : (b))
  */
 #define roundup_pow_of_two(n)			\
 (						\

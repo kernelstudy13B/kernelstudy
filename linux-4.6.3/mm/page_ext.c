@@ -53,12 +53,18 @@
  */
 
 static struct page_ext_operations *page_ext_ops[] = {
-	&debug_guardpage_ops,
+	&debug_guardpage_ops, // 페이지 할당 디버깅 기능 사용 관련
 #ifdef CONFIG_PAGE_POISONING
 	&page_poisoning_ops,
+	// Page Poisoning : 특정 byte pattern을 넣어놔서
+	// 메모리를 보호? 
+	// 예) 쓰레기값에 의해서 생길수있는 문제를 방지 
+	// 예2) free_pages() 후에  poisoning pattern을 넣어놓고 alloc_pages() 전에 
+	// 메모리 값을 확인해 메모리에 무슨값이 쓰였는지 확인 가능
 #endif
 #ifdef CONFIG_PAGE_OWNER
 	&page_owner_ops,
+	// page owner 추적 기능 관련
 #endif
 #if defined(CONFIG_IDLE_PAGE_TRACKING) && !defined(CONFIG_64BIT)
 	&page_idle_ops,
@@ -72,6 +78,8 @@ static bool __init invoke_need_callbacks(void)
 	int i;
 	int entries = ARRAY_SIZE(page_ext_ops);
 
+	// page_ext_ops 엔트리중 하나라도 need callback이 true를 리턴하면 
+	// 이 함수에서 true를 리턴 
 	for (i = 0; i < entries; i++) {
 		if (page_ext_ops[i]->need && page_ext_ops[i]->need())
 			return true;
@@ -131,6 +139,8 @@ static int __init alloc_node_page_ext(int nid)
 	unsigned long nr_pages;
 
 	nr_pages = NODE_DATA(nid)->node_spanned_pages;
+	// 해당 노드에서 absent page(hole)을 제외한 페이지 수
+	// sparsemem은 홀을 제외한 수고, flatmem은 해당 노드의 전체 페이지수
 	if (!nr_pages)
 		return 0;
 
@@ -142,6 +152,7 @@ static int __init alloc_node_page_ext(int nid)
 	if (!IS_ALIGNED(node_start_pfn(nid), MAX_ORDER_NR_PAGES) ||
 		!IS_ALIGNED(node_end_pfn(nid), MAX_ORDER_NR_PAGES))
 		nr_pages += MAX_ORDER_NR_PAGES;
+	// 노드 시작 주소와 끝 주소가 정렬이 안되있으면 할당할 페이지 수를 MAX_ORDER_NR_PAGES만큼 증가시킨다.
 
 	table_size = sizeof(struct page_ext) * nr_pages;
 
@@ -151,10 +162,12 @@ static int __init alloc_node_page_ext(int nid)
 	if (!base)
 		return -ENOMEM;
 	NODE_DATA(nid)->node_page_ext = base;
-	total_usage += table_size;
+	total_usage += table_size; // page_ext 가 사용중인 전역 사용량(byte 단위) 
 	return 0;
 }
-
+// #ifdef CONFIG_SPARSEMEM 인 경우에는 함수가 비어 있음
+// flat memory model을 사용하는 경우에 page 구조체를 수정하지 않고
+// page_ext 라는 구조체를 새로 할당해 이용한다. 
 void __init page_ext_init_flatmem(void)
 {
 

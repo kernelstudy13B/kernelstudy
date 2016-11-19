@@ -6729,32 +6729,45 @@ void *__init alloc_large_system_hash(const char *tablename,
 		/* It isn't necessary when PAGE_SIZE >= 1MB */
 		if (PAGE_SHIFT < 20)
 			numentries = round_up(numentries, (1<<20)/PAGE_SIZE);
+			// 만약에 PAGE_SIZE가 4KB라 치면 numentries가 256의 배수가 되도록
+			// 하는듯?
 
 		/* limit to 1 bucket per 2^scale bytes of low memory */
-		if (scale > PAGE_SHIFT)
+		if (scale > PAGE_SHIFT) 
 			numentries >>= (scale - PAGE_SHIFT);
 		else
 			numentries <<= (PAGE_SHIFT - scale);
 
 		/* Make sure we've got at least a 0-order allocation.. */
 		if (unlikely(flags & HASH_SMALL)) {
+			// pid hash, futex hash 이면서 size가 256보다 작을떄 
+			// HASH_SMALL flag 사용
 			/* Makes no sense without HASH_EARLY */
 			WARN_ON(!(flags & HASH_EARLY));
-			if (!(numentries >> *_hash_shift)) {
+			if (!(numentries >> *_hash_shift)) { 
+				// numentries 수가 1 << hash_shift 보다는 커야함
+				// 최소 크기 확보
 				numentries = 1UL << *_hash_shift;
 				BUG_ON(!numentries);
 			}
-		} else if (unlikely((numentries * bucketsize) < PAGE_SIZE))
+		} else if (unlikely((numentries * bucketsize) < PAGE_SIZE)) 
+			// hashtable 배열과 거기에 매달리는 리스트의 총 크기가
+			// 페이지 크기보다 작으면 페이지크기로 맞춰줌
+			// 최소 크기 보장
+			// 한페이지도 못채우는 해시 엔트리의 경우 한 페이지를 채우는 수만큼 확대 조정
 			numentries = PAGE_SIZE / bucketsize;
 	}
 	numentries = roundup_pow_of_two(numentries);
+	// numentries를 2의 지수승으로 올림
+	// 4000 -> 4096
 
 	/* limit allocation size to 1/16 total memory by default */
 	if (max == 0) {
 		max = ((unsigned long long)nr_all_pages << PAGE_SHIFT) >> 4;
 		do_div(max, bucketsize);
 	}
-	max = min(max, 0x80000000ULL);
+	// max 해시 테이블 엔트리 개수의 최대
+	max = min(max, 0x80000000ULL); // 2G
 
 	if (numentries < low_limit)
 		numentries = low_limit;
@@ -6762,8 +6775,10 @@ void *__init alloc_large_system_hash(const char *tablename,
 		numentries = max;
 
 	log2qty = ilog2(numentries);
-
-	do {
+	// numentries : 해시테이블 배열(리스트 헤드의 배열)의 엔트리 개수
+	// bucketsize : 해시테이블 한 버킷이 가질수 있는 리스트의 크기
+	// size : 해시테이블 배열(리스트 헤드의 배열)의 크기
+	do { // 할당안되면 할당 될때까지 log2qty 를 줄이면서 계속 할당 시도
 		size = bucketsize << log2qty;
 		if (flags & HASH_EARLY)
 			table = memblock_virt_alloc_nopanic(size, 0);
