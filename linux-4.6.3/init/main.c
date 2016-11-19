@@ -572,11 +572,12 @@ asmlinkage __visible void __init start_kernel(void) //called by head.S
 		parse_args("Setting init args", after_dashes, NULL, 0, -1, -1,
 			   NULL, set_init_arg);
 
-	jump_label_init();
+	jump_label_init();//테이블에는 NOP으로 가야할떄의 주소와 branch로 가야할떄의 주소인지를 초기에 초기화하는 부분.
 
 	/*
 	 * These use large bootmem allocations and must precede
 	 * kmem_cache_init()
+	 큰 bootmem 할당 사용, 
 	 */
 	setup_log_buf(0);
 	pidhash_init();

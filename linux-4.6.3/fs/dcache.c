@@ -3437,7 +3437,8 @@ EXPORT_SYMBOL(d_genocide);
 
 void __init vfs_caches_init_early(void)
 {
-	dcache_init_early();
+	//VFS에서 사용하는 Dentry 캐시와 inode 캐시에 대해 early할당받고 초기화
+	dcache_init_early();//dcache : 디엔트리 캐시
 	inode_init_early();
 }
 

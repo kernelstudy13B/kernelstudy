@@ -572,6 +572,7 @@ struct pid *find_ge_pid(int nr, struct pid_namespace *ns)
  * machine.  From a minimum of 16 slots up to 4096 slots at one gigabyte or
  * more.
  */
+//pid 테이블을 해쉬로 구현하여 빠르게 검색하고 처리 할 수 있도록 하는데 이 함수를 사용하여 초기화
 void __init pidhash_init(void)
 {
 	unsigned int i, pidhash_size;
@@ -580,10 +581,14 @@ void __init pidhash_init(void)
 					   HASH_EARLY | HASH_SMALL,
 					   &pidhash_shift, NULL,
 					   0, 4096);
+	//현재 커널은 초기화중이므로 early를 사용하여 memblock에 pid용 해시테이블 공간을 할당받는다.
+	//HASH_EARLY - memblock에 할당요청
+	//HASH_SMALL - 최소 엔트리 수인 경우 확대하도록 함
+	//세번쨰 인수로 0이 주어진 경우 커널의 lowmem free 페이지 공간을 확인하여 최대 수 해시 엔트리 수를 계산.
 	pidhash_size = 1U << pidhash_shift;
 
 	for (i = 0; i < pidhash_size; i++)
-		INIT_HLIST_HEAD(&pid_hash[i]);
+		INIT_HLIST_HEAD(&pid_hash[i]);//해시리스트 초기화
 }
 
 void __init pidmap_init(void)

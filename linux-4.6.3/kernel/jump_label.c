@@ -200,23 +200,37 @@ static void __jump_label_update(struct static_key *key,
 
 void __init jump_label_init(void)
 {
+	//branch miss ratio를 낮추어 성능을 향상시키기 위해
+	//static key를 사용한 jump label API를 사용하는데 커널에서 이런 jump label
+	//코드들을 모두 찾아 초기화
+
+	//branch miss ratio : true로 갈 확률과 false로 갈 확률에 대한 계산 miss율
+	//컴파일러 단계에서의 단위
+	//Unlikely(...), Likely(...)와 같은 키워드와 연관???
+
 	struct jump_entry *iter_start = __start___jump_table;
+	//jump table 의 시작 엔트리
 	struct jump_entry *iter_stop = __stop___jump_table;
+	//jump table의 끝 엔트리
 	struct static_key *key = NULL;
 	struct jump_entry *iter;
+	//jump table은 언제 만들어졌는가 - 모든 분기가 일어나는 부분을 컴파일러가 관리
 
-	jump_label_lock();
+	jump_label_lock();//접근 제한
 	jump_label_sort_entries(iter_start, iter_stop);
+	//jump table에 있는 엔트리를 key 주소로 heap sort(key의 주소를 기준으로 sorting)
 
 	for (iter = iter_start; iter < iter_stop; iter++) {
-		struct static_key *iterk;
+		struct static_key *iterk;//현재 엔트리가 가리키는 키
 
 		/* rewrite NOPs */
+		//NOPs : 아무것도 하지 않는 instruction
 		if (jump_label_type(iter) == JUMP_LABEL_NOP)
 			arch_jump_label_transform_static(iter, JUMP_LABEL_NOP);
+		//현재 엔트리의 키가 NOP이라면 static key를 사용한 jump_label 몌ㅑ코드 주소에 1 word 코드로 치환
 
 		iterk = jump_entry_key(iter);
-		if (iterk == key)
+		if (iterk == key)//처음 체크한 키에 대해선 따로 작업을 하지 않음.
 			continue;
 
 		key = iterk;
@@ -224,8 +238,9 @@ void __init jump_label_init(void)
 		 * Set key->entries to iter, but preserve JUMP_LABEL_TRUE_BRANCH.
 		 */
 		*((unsigned long *)&key->entries) += (unsigned long)iter;
+		//key->entries에 static key 선언을 하면 default 값 (0과 1)이 들어잇는데 이곳에 key 객체주소를 더한다. jump entry는 중복될수 있음을 알수있는 부분
 #ifdef CONFIG_MODULES
-		key->next = NULL;
+		key->next = NULL;//static key 모듈이 활성화되어있을때만 생기는 필드
 #endif
 	}
 	static_key_initialized = true;

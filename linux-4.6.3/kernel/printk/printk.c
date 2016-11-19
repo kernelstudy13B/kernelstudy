@@ -930,15 +930,19 @@ static inline void log_buf_add_cpu(void) {}
 
 void __init setup_log_buf(int early)
 {
+	//많은 cpu를 사용하는 SMP 시스템에서 로그 버퍼가 부족해지는 경우가 있어 그런 시스템에서 더 커진 로그 버퍼를 할당
 	unsigned long flags;
 	char *new_log_buf;
 	int free;
 
-	if (log_buf != __log_buf)
+	if (log_buf != __log_buf)//초기에 설정되어있는것이 다른 것으로 재설정되어있으면 함수를 빠져나감
 		return;
-
+	//지금은 early가 0이므로 early형식으로 호출될 함수가 아니다
+	//정규호출(early=0)은 setup_arch()함수가 완료되고 나서 호출한다.
+	//정규적인게 아닌 보다 빠르게 로그 버퍼가 필요하다면 early=1로 하여 호출한다. 예를들어 x86 아키텍처는 setup_arch()함수에서 호출한다.
 	if (!early && !new_log_buf_len)
 		log_buf_add_cpu();
+	//cpu 개수에 따라 길이가 지정이 된다.
 
 	if (!new_log_buf_len)
 		return;
@@ -946,23 +950,30 @@ void __init setup_log_buf(int early)
 	if (early) {
 		new_log_buf =
 			memblock_virt_alloc(new_log_buf_len, LOG_ALIGN);
+		//memblock 할당이 안되면 panic 호출
 	} else {
 		new_log_buf = memblock_virt_alloc_nopanic(new_log_buf_len,
 							  LOG_ALIGN);
+		//emeblock 할당이 안되도 panic을 호출하지 않음.
 	}
 
-	if (unlikely(!new_log_buf)) {
+	if (unlikely(!new_log_buf)) //new_log_buf가 적은 확률로 설정이 되어있지 않는 경우
+	{
 		pr_err("log_buf_len: %ld bytes not available\n",
 			new_log_buf_len);
 		return;
 	}
 
 	raw_spin_lock_irqsave(&logbuf_lock, flags);
-	log_buf_len = new_log_buf_len;
-	log_buf = new_log_buf;
+
+	log_buf_len = new_log_buf_len;//새로 지정된 버퍼길이를 log_buf_len에 넣음
+	log_buf = new_log_buf;//새로 지정된 버퍼를 log_buf에 넣음
 	new_log_buf_len = 0;
-	free = __LOG_BUF_LEN - log_next_idx;
+	//새로 할당 받은 버퍼 설정.
+
+	free = __LOG_BUF_LEN - log_next_idx;//남은 공간
 	memcpy(log_buf, __log_buf, __LOG_BUF_LEN);
+	//원래 로그 버퍼 전체를 새 로그 버퍼에 복사
 	raw_spin_unlock_irqrestore(&logbuf_lock, flags);
 
 	pr_info("log_buf_len: %d bytes\n", log_buf_len);
