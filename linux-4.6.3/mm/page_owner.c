@@ -45,7 +45,7 @@ static void init_page_owner(void)
 	// static_branch_enable 함수를 이용해 인자가 true가 기본이 되게 동적으로 변경
 	// 내부적으로 static_key_slow_inc 로 1증가 (0->1)
 	// static_key_slow_dec 함수로 1 감소(disable : 1->0)
-	init_early_allocated_pages(); // 161123 여기해야함
+	init_early_allocated_pages(); // pcp page cache에서 buddy 할당자로 drain, page들에 대한 owner bit 설정
 }
 
 struct page_ext_operations page_owner_ops = {
@@ -289,17 +289,18 @@ static void init_pages_in_zone(pg_data_t *pgdat, struct zone *zone)
 	 * a zone boundary, it will be double counted between zones. This does
 	 * not matter as the mixed block count will still be correct
 	 */
+	// page 단위로 순회
 	for (; pfn < end_pfn; ) {
 		if (!pfn_valid(pfn)) {
 			pfn = ALIGN(pfn + 1, MAX_ORDER_NR_PAGES);
 			continue;
 		}
 
-		block_end_pfn = ALIGN(pfn + 1, pageblock_nr_pages);
-		block_end_pfn = min(block_end_pfn, end_pfn);
+		block_end_pfn = ALIGN(pfn + 1, pageblock_nr_pages); // 마지막 블락 align
+		block_end_pfn = min(block_end_pfn, end_pfn); // align 한 블락이 end_pfn을 넘어가는 경우를 처리하기 위해서?
 
+		// block 은 버디에서 할당하고자하는 페이지의 묶음이라고 추정? 
 		page = pfn_to_page(pfn);
-
 		for (; pfn < block_end_pfn; pfn++) {
 			if (!pfn_valid_within(pfn))
 				continue;
@@ -310,22 +311,22 @@ static void init_pages_in_zone(pg_data_t *pgdat, struct zone *zone)
 			 * We are safe to check buddy flag and order, because
 			 * this is init stage and only single thread runs.
 			 */
-			if (PageBuddy(page)) {
+			if (PageBuddy(page)) { // 해당 페이지가 버디 시스템에 속해 있으면
 				pfn += (1UL << page_order(page)) - 1;
 				continue;
 			}
 
-			if (PageReserved(page))
+			if (PageReserved(page)) // 예약 상태이면
 				continue;
 
-			page_ext = lookup_page_ext(page);
+			page_ext = lookup_page_ext(page); // 해당 페이지에 대한 page_ext
 
 			/* Maybe overraping zone */
-			if (test_bit(PAGE_EXT_OWNER, &page_ext->flags))
+			if (test_bit(PAGE_EXT_OWNER, &page_ext->flags))//PAGE_EXT_OWNER이 set 되어있는지
 				continue;
 
 			/* Found early allocated page */
-			set_page_owner(page, 0, 0);
+			set_page_owner(page, 0, 0); // 해당 페이지에 owner 비트를 설정
 			count++;
 		}
 	}
@@ -353,7 +354,7 @@ static void init_zones_in_node(pg_data_t *pgdat)
 static void init_early_allocated_pages(void)
 {
 	//Per-CPU Page Frame Cache를 buddy allocator로 다시 돌려보내고 노드안에 있는 zone을 초기화한다.
-	pg_data_t *pgdat;
+	pg_data_t *pgdat; // pg_data_t = struct pglist_data (node를 나타내는 구조체)
 
 	drain_all_pages(NULL);//percpu 페이지 프레임 캐시에 대한 작업이 이루어짐
 	for_each_online_pgdat(pgdat)

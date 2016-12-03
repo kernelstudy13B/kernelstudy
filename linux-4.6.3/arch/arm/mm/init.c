@@ -419,8 +419,14 @@ static void __init free_unused_memmap(void)
 	 * This relies on each bank being in address order.
 	 * The banks are sorted previously in bootmem_init().
 	 */
-	for_each_memblock(memory, reg) {
-		start = memblock_region_memory_base_pfn(reg);
+	// memblock 타입이 memory memblock, reserved memblock, physmem memblock 세가지가 있고
+	// 각각 memblock 타입을 구성하는 단위가 region 128, 128, 4개가 있음
+	// memory memblock은 할당받아 사용이 가능하고
+	// reserved memblock은 용도가 정해져서 사용할 수 없는 영역
+	// physmem memblock 물리 메모리 영역
+	
+	for_each_memblock(memory, reg) { // 모든 memblock의 region을 순회
+		start = memblock_region_memory_base_pfn(reg); // region 주소를 갖고 pfn을 찾음
 
 #ifdef CONFIG_SPARSEMEM
 		/*
@@ -429,6 +435,9 @@ static void __init free_unused_memmap(void)
 		 */
 		start = min(start,
 				 ALIGN(prev_end, PAGES_PER_SECTION));
+		// sparse 메모리 모델에서의 메모리 관리 최소 단위가 section인데
+		// hole에 대해서는 section이 없기 때문에 해제할 메모리가 없다.
+		// 할당이 된 section에서 사용하지않는 mem_map에 대해서 해제
 #else
 		/*
 		 * Align down here since the VM subsystem insists that the
@@ -436,20 +445,22 @@ static void __init free_unused_memmap(void)
 		 * MAX_ORDER_NR_PAGES.
 		 */
 		start = round_down(start, MAX_ORDER_NR_PAGES);
+		// sparse memory model 이 아닌경우 MAX_ORDER_NR_PAGES 단위로 round down
 #endif
 		/*
 		 * If we had a previous bank, and there is a space
 		 * between the current bank and the previous, free it.
 		 */
-		if (prev_end && prev_end < start)
+		if (prev_end && prev_end < start) // prev_end : 이전 region의 마지막 pfn
 			free_memmap(prev_end, start);
+		// prev_end ~ start 사이가 hole이다. 이 공간을 free
 
 		/*
 		 * Align up here since the VM subsystem insists that the
 		 * memmap entries are valid from the bank end aligned to
 		 * MAX_ORDER_NR_PAGES.
 		 */
-		prev_end = ALIGN(memblock_region_memory_end_pfn(reg),
+		prev_end = ALIGN(memblock_region_memory_end_pfn(reg), // 현재 region의 pfn을 정렬해서 prev_end에 담은
 				 MAX_ORDER_NR_PAGES);
 	}
 
@@ -457,6 +468,7 @@ static void __init free_unused_memmap(void)
 	if (!IS_ALIGNED(prev_end, PAGES_PER_SECTION))
 		free_memmap(prev_end,
 			    ALIGN(prev_end, PAGES_PER_SECTION));
+	// 마지막 region의 끝이 PAGES_PER_SECTION으로 align 되어 있지 않으면, prev_end ~ PAGES_PER_SECTION 사이를 free
 #endif
 }
 
@@ -533,10 +545,11 @@ void __init mem_init(void)
 #endif
 
 	set_max_mapnr(pfn_to_page(max_pfn) - mem_map);
+	// UMA 시스템에서만 전역 max_mapnr에 mem_map[] 배열에 대한 인덱스 번호를 저장한다.
 
 	/* this will put all unused low memory onto the freelists */
-	free_unused_memmap();
-	free_all_bootmem();
+	free_unused_memmap(); // sparse or dicontig 메모리 모델에서 메모리 사이에 사용하지않는 공간이 상당히 클 수 있기 때문에 메모리 낭비를 막기위해서 미사용 공간에 대한 mep_map[]을 페이지 단위로 reserve memblock에서 free 시킨다.
+	free_all_bootmem(); // 161210
 
 #ifdef CONFIG_SA1111
 	/* now that our DMA memory is actually so designated, we can free it */

@@ -489,7 +489,7 @@ static void __init mm_init(void)
 	 * page_ext requires contiguous pages,
 	 * bigger than MAX_ORDER unless SPARSEMEM.
 	 */
-	page_ext_init_flatmem();
+	page_ext_init_flatmem(); // page_ext 구조체에 대한 할당과 초기화
 	mem_init();
 	kmem_cache_init();
 	percpu_init_late();

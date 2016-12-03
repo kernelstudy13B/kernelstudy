@@ -67,7 +67,7 @@ static struct page_ext_operations *page_ext_ops[] = {
 	// page owner 추적 기능 관련 함수가 등록되어있다.
 	
 #endif
-#if defined(CONFIG_IDLE_PAGE_TRACKING) && !defined(CONFIG_64BIT)
+#if defined(CONFIG_IDLE_PAGE_TRACKING) && !defined(CONFIG_64BIT) // idle page tracking이 설정되어 있고 64 bit 가 아닐떄
 	&page_idle_ops,
 #endif
 };
@@ -177,7 +177,7 @@ void __init page_ext_init_flatmem(void)
 	if (!invoke_need_callbacks())
 		return;
 
-	for_each_online_node(nid)  {
+	for_each_online_node(nid)  { // node를 순회하면서 node당 page_ext 구조체를 할당
 		fail = alloc_node_page_ext(nid);
 		if (fail)
 			goto fail;
