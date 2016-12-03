@@ -352,9 +352,10 @@ static void init_zones_in_node(pg_data_t *pgdat)
 
 static void init_early_allocated_pages(void)
 {
+	//Per-CPU Page Frame Cache를 buddy allocator로 다시 돌려보내고 노드안에 있는 zone을 초기화한다.
 	pg_data_t *pgdat;
 
-	drain_all_pages(NULL);
+	drain_all_pages(NULL);//percpu 페이지 프레임 캐시에 대한 작업이 이루어짐
 	for_each_online_pgdat(pgdat)
 		init_zones_in_node(pgdat);
 }

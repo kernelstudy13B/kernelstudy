@@ -62,9 +62,10 @@ static struct page_ext_operations *page_ext_ops[] = {
 	// 예2) free_pages() 후에  poisoning pattern을 넣어놓고 alloc_pages() 전에 
 	// 메모리 값을 확인해 메모리에 무슨값이 쓰였는지 확인 가능
 #endif
-#ifdef CONFIG_PAGE_OWNER
+#ifdef CONFIG_PAGE_OWNER //이버그용으로 CONFIG_PAGE_OWNER 옵션이동작하는 경우에만 쓰임
 	&page_owner_ops,
-	// page owner 추적 기능 관련
+	// page owner 추적 기능 관련 함수가 등록되어있다.
+	
 #endif
 #if defined(CONFIG_IDLE_PAGE_TRACKING) && !defined(CONFIG_64BIT)
 	&page_idle_ops,

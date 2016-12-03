@@ -217,6 +217,7 @@ void set_pgdat_percpu_threshold(pg_data_t *pgdat,
  * For use when we know that interrupts are disabled,
  * or when we know that preemption is disabled and that
  * particular counter cannot be updated from interrupt context.
+ 인터럽트가 불가하다는걸 알때, 또는 preemption이 불가하다는걸 알떄 ,특정 카운터는 인터럽트 컨텍스트로부터 업데이트될수 없다.
  */
 void __mod_zone_page_state(struct zone *zone, enum zone_stat_item item,
 			   long delta)
@@ -231,7 +232,7 @@ void __mod_zone_page_state(struct zone *zone, enum zone_stat_item item,
 	t = __this_cpu_read(pcp->stat_threshold);
 
 	if (unlikely(x > t || x < -t)) {
-		zone_page_state_add(x, zone, item);
+		zone_page_state_add(x, zone, item);//상태 업데이트
 		x = 0;
 	}
 	__this_cpu_write(*p, x);

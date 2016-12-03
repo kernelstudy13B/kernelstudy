@@ -695,21 +695,29 @@ static inline void __free_one_page(struct page *page,
 	unsigned int max_order;
 
 	max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1);
-
+	//MAX_ORDER와 pageblock_order + 1의 최소값을 찾음
+	//버디 시스템 메모리 영역은 2^10 페이지 단위로 align 관리하는데 
+	//더 큰 값이 지원이 되면 pageblock_order + 1로 설정된다.
+	
 	VM_BUG_ON(!zone_is_initialized(zone));
 	VM_BUG_ON_PAGE(page->flags & PAGE_FLAGS_CHECK_AT_PREP, page);
 
 	VM_BUG_ON(migratetype == -1);
 	if (likely(!is_migrate_isolate(migratetype)))
+		//migratetype이 isolate타입이 아닌경우
 		__mod_zone_freepage_state(zone, 1 << order, migratetype);
+	//order가 0(2^0 = 1개)인 페이지를 전부 free
+
 
 	page_idx = pfn & ((1 << MAX_ORDER) - 1);
+	//페이지 인덱스가 max_order를 넘지 않도록 함
+	//상위비트를 수정
 
 	VM_BUG_ON_PAGE(page_idx & ((1 << order) - 1), page);
 	VM_BUG_ON_PAGE(bad_range(zone, page), page);
 
 continue_merging:
-	while (order < max_order - 1) {
+	while (order < max_order - 1) {//초기 order는 0
 		buddy_idx = __find_buddy_index(page_idx, order);
 		buddy = page + (buddy_idx - page_idx);
 		if (!page_is_buddy(page, buddy, order))
@@ -719,14 +727,21 @@ continue_merging:
 		 * merge with it and move up one order.
 		 */
 		if (page_is_guard(buddy)) {
+			//guard 권한이 할당되있는 페이지는 어떤 종류의 접근이라도 발생하면 예외를 발생시킨다
 			clear_page_guard(zone, buddy, order, migratetype);
+			//guard 권한 해제
 		} else {
-			list_del(&buddy->lru);
-			zone->free_area[order].nr_free--;
+			//combine 하기 전 먼저 현재 슬롯에서 버디 페이지를 순서에 맞게 제거
+			list_del(&buddy->lru);//버디 페이지를 리스트에서 제거
+			zone->free_area[order].nr_free--;//order 슬롯에서 nr_free 제거
 			rmv_page_order(buddy);
+			//버디 표식인 page->private에 0 대입
 		}
 		combined_idx = buddy_idx & page_idx;
+		//order 가 상향된 상태에서 사용할 페이지 인덱스 계산
+		//버디 인덱스와 페이지 인덱스 중 작은것이 combined 인덱스
 		page = page + (combined_idx - page_idx);
+		//상향된 order에서 사용될 페이지
 		page_idx = combined_idx;
 		order++;
 	}
@@ -766,22 +781,25 @@ done_merging:
 	 * so it's less likely to be used soon and more likely to be merged
 	 * as a higher order page
 	 */
+	//order가 MAX-ORDER-2보다 작고 buddy 페이지가 valid 영역에 있는 경우
 	if ((order < MAX_ORDER-2) && pfn_valid_within(page_to_pfn(buddy))) {
 		struct page *higher_page, *higher_buddy;
 		combined_idx = buddy_idx & page_idx;
+		//버디인덱스 페이지인덱스 둘중 하나를 combined 인덱스로 할당
 		higher_page = page + (combined_idx - page_idx);
 		buddy_idx = __find_buddy_index(combined_idx, order + 1);
 		higher_buddy = higher_page + (buddy_idx - combined_idx);
 		if (page_is_buddy(higher_page, higher_buddy, order + 1)) {
 			list_add_tail(&page->lru,
 				&zone->free_area[order].free_list[migratetype]);
+			//higher_page가 order+1슬롯에서 짝이되는 버디 페이지가 존재하는 경우 order 슬롯의 후미에 페이지를 추가
 			goto out;
 		}
 	}
 
 	list_add(&page->lru, &zone->free_area[order].free_list[migratetype]);
 out:
-	zone->free_area[order].nr_free++;
+	zone->free_area[order].nr_free++;//nr_free 증가
 }
 
 static inline int free_pages_check(struct page *page)
@@ -824,6 +842,7 @@ static inline int free_pages_check(struct page *page)
  * And clear the zone's pages_scanned counter, to hold off the "all pages are
  * pinned" detection logic.
  */
+//PCP 리스트들로부터 페이지들을 drain하는 함수
 static void free_pcppages_bulk(struct zone *zone, int count,
 					struct per_cpu_pages *pcp)
 {
@@ -834,6 +853,7 @@ static void free_pcppages_bulk(struct zone *zone, int count,
 
 	spin_lock(&zone->lock);
 	nr_scanned = zone_page_state(zone, NR_PAGES_SCANNED);
+	//스캔된 페이지가 얼마나 있는지를 확인
 	if (nr_scanned)
 		__mod_zone_page_state(zone, NR_PAGES_SCANNED, -nr_scanned);
 
@@ -847,7 +867,11 @@ static void free_pcppages_bulk(struct zone *zone, int count,
 		 * empty list is encountered.  This is so more pages are freed
 		 * off fuller lists instead of spinning excessively around empty
 		 * lists
-		 */
+		 
+		//라운드로빈 방식으로 리스트로붜 페이지를 삭제,
+		빈 리스트가 나타나면증가하는 batch_free count가 유지된다.
+		지나치게 빈 리스트를 도는것 대신에 더 않은 페이지 리스트들을 drai		 n한다.
+			*/
 		do {
 			batch_free++;
 			if (++migratetype == MIGRATE_PCPTYPES)
@@ -856,15 +880,16 @@ static void free_pcppages_bulk(struct zone *zone, int count,
 		} while (list_empty(list));
 
 		/* This is the only non-empty list. Free them all. */
+		//batch_free 카운터와 MIGRATE~가 같은 경우는 빈리스트가 없을떄.
 		if (batch_free == MIGRATE_PCPTYPES)
-			batch_free = to_free;
+			batch_free = to_free;//batch_free는 즉 페이지개수
 
 		do {
 			int mt;	/* migratetype of the to-be-freed page */
 
 			page = list_last_entry(list, struct page, lru);
 			/* must delete as __free_one_page list manipulates */
-			list_del(&page->lru);
+			list_del(&page->lru);//리스트에 있는 페이지들을 삭제
 
 			mt = get_pcppage_migratetype(page);
 			/* MIGRATE_ISOLATE page should not go to pcplists */
@@ -874,6 +899,7 @@ static void free_pcppages_bulk(struct zone *zone, int count,
 				mt = get_pageblock_migratetype(page);
 
 			__free_one_page(page, page_to_pfn(page), zone, 0, mt);
+			//buddy로 페이지를 넘겨준다
 			trace_mm_page_pcpu_drain(page, 0, mt);
 		} while (--to_free && --batch_free && !list_empty(list));
 	}
@@ -2063,14 +2089,14 @@ static void drain_pages(unsigned int cpu)
 {
 	struct zone *zone;
 
-	for_each_populated_zone(zone) {
+	for_each_populated_zone(zone) {//populated zone을 찾아서 drain을 시키는 껍데기 함수가 drain_pages
 		drain_pages_zone(cpu, zone);
 	}
 }
 
 /*
  * Spill all of this CPU's per-cpu pages back into the buddy allocator.
- *
+ * drain = spill back
  * The CPU has to be pinned. When zone parameter is non-NULL, spill just
  * the single zone's pages.
  */
@@ -2080,6 +2106,7 @@ void drain_local_pages(struct zone *zone)
 
 	if (zone)
 		drain_pages_zone(cpu, zone);
+	//zone이 null이 아니면 싱글 zone의 페이지들을 모두 drain
 	else
 		drain_pages(cpu);
 }
@@ -2100,25 +2127,33 @@ void drain_all_pages(struct zone *zone)
 	int cpu;
 
 	/*
-	 * Allocate in the BSS so we wont require allocation in
+	 * Allocate in the BSS so we won't require allocation in
 	 * direct reclaim path for CONFIG_CPUMASK_OFFSTACK=y
+	 BSS에 할당하여 CONFIG_CPUMASK_OFFSTACK=y 옵션을 위한 직접적인 선언을 요구하지 않는다.
 	 */
+	
+	//BSS : block started by symbol, 제로 값으로 표시된 정적으로 할당된 변수가 포함된 데이터 세그먼트의 일부로 컴파일러나 링커에 의해 사용.
+
 	static cpumask_t cpus_with_pcps;
 
 	/*
 	 * We don't care about racing with CPU hotplug event
-	 * as offline notification will cause the notified
-	 * cpu to drain that CPU pcps and on_each_cpu_mask
+	 * //as offline notification will cause the notified
+	 * cpu to drain that CPU pcps and //on_each_cpu_mask
 	 * disables preemption as part of its processing
+	 CPU 핫플러그 이벤트와는 무관한 부분.
+	 
+
 	 */
 	for_each_online_cpu(cpu) {
-		struct per_cpu_pageset *pcp;
+		struct per_cpu_pageset *pcp;//페이지 프레임 캐시로 추정되는 구조체
 		struct zone *z;
 		bool has_pcps = false;
 
 		if (zone) {
 			pcp = per_cpu_ptr(zone->pageset, cpu);
-			if (pcp->pcp.count)
+			//zone으로 부터 percpu 페이지프레임 캐시를 가져와서 저장.
+			if (pcp->pcp.count)//리스트안에 있는 페이지의 수
 				has_pcps = true;
 		} else {
 			for_each_populated_zone(z) {
