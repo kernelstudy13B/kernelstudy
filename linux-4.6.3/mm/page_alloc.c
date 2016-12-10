@@ -978,16 +978,17 @@ out:
 static void __meminit __init_single_page(struct page *page, unsigned long pfn,
 				unsigned long zone, int nid)
 {
-	set_page_links(page, zone, nid, pfn);
-	init_page_count(page);
-	page_mapcount_reset(page);
-	page_cpupid_reset_last(page);
+	set_page_links(page, zone, nid, pfn); // page 구조체에 node와 zone, section에 대해 마스킹
+	init_page_count(page); // page count를 1로(참조 카운트) 
+	page_mapcount_reset(page);// mapcount: pte의 이 page 사용카운터, mapcount를 -1로(pte는 페이지 테이블 마지막 엔트리) 
+	page_cpupid_reset_last(page);// 마지막에 접근한 CPU 마스킹
 
-	INIT_LIST_HEAD(&page->lru);
+	INIT_LIST_HEAD(&page->lru); // lru 페이지 리스트 초기화
 #ifdef WANT_PAGE_VIRTUAL
 	/* The shift won't overflow because ZONE_NORMAL is below 4G. */
-	if (!is_highmem_idx(zone))
-		set_page_address(page, __va(pfn << PAGE_SHIFT));
+	if (!is_highmem_idx(zone)) // highmem 이 아니면 가상주소로 설정??? 이상함 
+		// 어째든 가상주소를 쓰기 떄문에 1:1 매핑이라도 물리주소를 가상주소로 변경해서 설정
+		set_page_address(page, __va(pfn << PAGE_SHIFT));//page 주소에 가상 주소로 설정
 #endif
 }
 
@@ -1015,7 +1016,10 @@ static void init_reserved_page(unsigned long pfn)
 		if (pfn >= zone->zone_start_pfn && pfn < zone_end_pfn(zone))
 			break;
 	}
-	__init_single_pfn(pfn, zid, nid);
+	// 주어진 페이지의 노드를 찾고 그 노드가 관리하는 존들이 관리하는 페이지 프레임들에
+	// 주어진 페이지가 속하는 경우 break;
+	// 해당 페이지가 속하는 zone을 찾음(zid)
+	__init_single_pfn(pfn, zid, nid); //page 하나를 초기화
 }
 #else
 static inline void init_reserved_page(unsigned long pfn)
@@ -1029,13 +1033,14 @@ static inline void init_reserved_page(unsigned long pfn)
  * marks the pages PageReserved. The remaining valid pages are later
  * sent to the buddy page allocator.
  */
+// reserved 한 영역을 보호하고 남은 애들을 buddy로 보내기위해서 체크하는듯?
 void __meminit reserve_bootmem_region(phys_addr_t start, phys_addr_t end)
 {
 	unsigned long start_pfn = PFN_DOWN(start);
 	unsigned long end_pfn = PFN_UP(end);
 
 	for (; start_pfn < end_pfn; start_pfn++) {
-		if (pfn_valid(start_pfn)) {
+		if (pfn_valid(start_pfn)) { // 유효 페이지면
 			struct page *page = pfn_to_page(start_pfn);
 
 			init_reserved_page(start_pfn);
@@ -1043,7 +1048,8 @@ void __meminit reserve_bootmem_region(phys_addr_t start, phys_addr_t end)
 			/* Avoid false-positive PageTail() */
 			INIT_LIST_HEAD(&page->lru);
 
-			SetPageReserved(page);
+			SetPageReserved(page); // bit마스킹을 통해서 해당 페이지를 reserved한다.
+			// 신기한 문법
 		}
 	}
 }

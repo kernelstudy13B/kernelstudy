@@ -98,11 +98,21 @@ static void __init __free_pages_memory(unsigned long start, unsigned long end)
 
 	while (start < end) {
 		order = min(MAX_ORDER - 1UL, __ffs(start));
-
+		// 2^n 단위로 자른다.
+		// __ffs() : lsb->msb 순으로 1로 설정된 비트를 찾는다. 못찾으면 -1 리턴
+		
 		while (start + (1UL << order) > end)
 			order--;
+		// end : 10100100
+		// start : 10010101
+		// order : 0, 1 할당, start : 10010110 
+		// order : 1, 2 할당, start : 10011000
+		// order : 3, 8 할당, start : 10100000
+		// order : 5, 32 할당 실패
+		// order : 4, 16 할당 실패
+		// order : 3, 8 할당, start : 10100100 end랑 같아져서 끝
 
-		__free_pages_bootmem(pfn_to_page(start), start, order);
+		__free_pages_bootmem(pfn_to_page(start), start, order); // 161217일 해야함
 
 		start += (1UL << order);
 	}
@@ -129,14 +139,17 @@ static unsigned long __init free_low_memory_core_early(void)
 	phys_addr_t start, end;
 	u64 i;
 
-	memblock_clear_hotplug(0, -1);
+	memblock_clear_hotplug(0, -1); // 전체 memory memblock 영역에 대해 MEMBLOCK_HOTPLUG 비트를 clear. 메모리 핫플러그 못하게함.
 
-	for_each_reserved_mem_region(i, &start, &end)
+	for_each_reserved_mem_region(i, &start, &end) // memblock으로 관리되던 reserved 영역을 페이지 단위로 초기화하고 페이지에 reserved되었다고 표시
 		reserve_bootmem_region(start, end);
-
+	
+	// NUMA_NO_NODE for all nodes  
+	// MEMBLOCK_NONE           = 0x0,  /* No special request */
 	for_each_free_mem_range(i, NUMA_NO_NODE, MEMBLOCK_NONE, &start, &end,
-				NULL)
+				NULL) // memblock 단위로 순회
 		count += __free_memory_core(start, end);
+	// 모든 free lowmem 영역을 모두 버디 시스템의 free_list에 이관 등록한다.
 
 #ifdef CONFIG_ARCH_DISCARD_MEMBLOCK
 	{
@@ -185,18 +198,19 @@ void __init reset_all_zones_managed_pages(void)
  *
  * Returns the number of pages actually released.
  */
+// 모든 free lowmem 영역을 모두 버디 시스템의 free_list에 이관 등록한다.
 unsigned long __init free_all_bootmem(void)
 {
 	unsigned long pages;
 
-	reset_all_zones_managed_pages();
+	reset_all_zones_managed_pages(); // online node를 순회하면서 각 zone->managed_pages를 0으로 초기화
 
 	/*
 	 * We need to use NUMA_NO_NODE instead of NODE_DATA(0)->node_id
 	 *  because in some case like Node0 doesn't have RAM installed
 	 *  low ram will be on Node1
 	 */
-	pages = free_low_memory_core_early();
+	pages = free_low_memory_core_early(); //free lowmem 영역을 모두 버디 시스템의 free_list로 이관한다.
 	totalram_pages += pages;
 
 	return pages;
