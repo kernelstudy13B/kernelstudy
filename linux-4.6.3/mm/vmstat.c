@@ -219,23 +219,33 @@ void set_pgdat_percpu_threshold(pg_data_t *pgdat,
  * particular counter cannot be updated from interrupt context.
  인터럽트가 불가하다는걸 알때, 또는 preemption이 불가하다는걸 알떄 ,특정 카운터는 인터럽트 컨텍스트로부터 업데이트될수 없다.
  */
+
+/*
+ * 전역 vm_stat이 있고
+ * zone 당 zone->vm_stat이 있다.
+ *
+ * per_cpu_pageset->vm_stat_diff 는 zone->vm_stat의 변화값을 가지고 있다.
+ * 자주 zone->vm_stat에 접근하는 빈도를 줄이기 위해 사용하며
+ * 주기적으로 vm_stat과 zone->vm_stat을 갱신한다.
+ * 
+ */
 void __mod_zone_page_state(struct zone *zone, enum zone_stat_item item,
 			   long delta)
 {
 	struct per_cpu_pageset __percpu *pcp = zone->pageset;
-	s8 __percpu *p = pcp->vm_stat_diff + item;
+	s8 __percpu *p = pcp->vm_stat_diff + item; // p에는 수정하고자 하는 변수가 들어옴
 	long x;
 	long t;
 
-	x = delta + __this_cpu_read(*p);
+	x = delta + __this_cpu_read(*p); // p를 읽어서 delta 만큼 더한 값을 x에 저장
 
-	t = __this_cpu_read(pcp->stat_threshold);
+	t = __this_cpu_read(pcp->stat_threshold); // t는 threshold
 
-	if (unlikely(x > t || x < -t)) {
-		zone_page_state_add(x, zone, item);//상태 업데이트
-		x = 0;
+	if (unlikely(x > t || x < -t)) { // threshold를 x가 벗어나는 경우
+		zone_page_state_add(x, zone, item);//상태 업데이트 (vm_stat[], zone->vm_stat[] 둘 모두)
+		x = 0; //per_cpu_pageset->vm_stat_diff를 0으로
 	}
-	__this_cpu_write(*p, x);
+	__this_cpu_write(*p, x); // p에다가 x를 씀
 }
 EXPORT_SYMBOL(__mod_zone_page_state);
 

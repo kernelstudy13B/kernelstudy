@@ -700,23 +700,26 @@ static inline void __free_one_page(struct page *page,
 	//버디 시스템 메모리 영역은 2^10 페이지 단위로 align 관리하는데 
 	//더 큰 값이 지원이 되면 pageblock_order + 1로 설정된다.
 	
-	VM_BUG_ON(!zone_is_initialized(zone));
-	VM_BUG_ON_PAGE(page->flags & PAGE_FLAGS_CHECK_AT_PREP, page);
+	VM_BUG_ON(!zone_is_initialized(zone)); // zone이 초기화되있지 않다면 버그
+	VM_BUG_ON_PAGE(page->flags & PAGE_FLAGS_CHECK_AT_PREP, page); // 페이지가 준비가 안되있으면 버그
 
-	VM_BUG_ON(migratetype == -1);
-	if (likely(!is_migrate_isolate(migratetype)))
-		//migratetype이 isolate타입이 아닌경우
+	VM_BUG_ON(migratetype == -1); // 마이그래트 타입이 -1 이면 버그
+	if (likely(!is_migrate_isolate(migratetype))) //migratetype이 isolate타입이 아닌경우
 		__mod_zone_freepage_state(zone, 1 << order, migratetype);
-	//order가 0(2^0 = 1개)인 페이지를 전부 free
+		// 1 << order 값을
+		// per_cpu_pageset->vm_stat_diff에 변화량을 유지하다가 특정값을 넘어서면 아래를 수행
+		// zone->vm_stat[NR_FREE_PAGES]에 더해줌 
+		// vm_stat[NR_FREE_PAGES]에도 더해줌 
 
 
 	page_idx = pfn & ((1 << MAX_ORDER) - 1);
 	//페이지 인덱스가 max_order를 넘지 않도록 함
 	//상위비트를 수정
 
-	VM_BUG_ON_PAGE(page_idx & ((1 << order) - 1), page);
-	VM_BUG_ON_PAGE(bad_range(zone, page), page);
+	VM_BUG_ON_PAGE(page_idx & ((1 << order) - 1), page); // page_idx에 문제가 있으면 버그
+	VM_BUG_ON_PAGE(bad_range(zone, page), page); // 범위가 맞지 않으면 버그
 
+// 161224 여기까지함
 continue_merging:
 	while (order < max_order - 1) {//초기 order는 0
 		buddy_idx = __find_buddy_index(page_idx, order);
@@ -908,6 +911,7 @@ static void free_pcppages_bulk(struct zone *zone, int count,
 	spin_unlock(&zone->lock);
 }
 
+// buddy 로 보낸다.
 static void free_one_page(struct zone *zone,
 				struct page *page, unsigned long pfn,
 				unsigned int order,
@@ -915,13 +919,20 @@ static void free_one_page(struct zone *zone,
 {
 	unsigned long nr_scanned;
 	spin_lock(&zone->lock);
-	nr_scanned = zone_page_state(zone, NR_PAGES_SCANNED);
-	if (nr_scanned)
+	nr_scanned = zone_page_state(zone, NR_PAGES_SCANNED); // zone->vm_stat[NR_PAGES_SCANNED] 값을읽어온다.
+	if (nr_scanned) // scan한 페이지 수가 있으면
 		__mod_zone_page_state(zone, NR_PAGES_SCANNED, -nr_scanned);
+		// zone->vm_stat[NR_PAGES_SCANNED]에 -nr_scanned를 더해서 0으로 만든다.
 
-	if (unlikely(has_isolate_pageblock(zone) ||
-		is_migrate_isolate(migratetype))) {
-		migratetype = get_pfnblock_migratetype(page, pfn);
+	// * PG_isolated (linux documentation - page_migration
+	//
+	// To prevent concurrent isolation among several CPUs, VM marks isolated page
+	// as PG_isolated under lock_page. So if a CPU encounters PG_isolated non-lru
+	// movable page, it can skip it
+
+	if (unlikely(has_isolate_pageblock(zone) || //zone에 isolate 타입이 존재하거나
+		is_migrate_isolate(migratetype))) { // 인수로 isolate 타입이 지정된 경우
+		migratetype = get_pfnblock_migratetype(page, pfn);  // 이걸 왜 또하는지 모르겠음...
 	}
 	__free_one_page(page, pfn, zone, order, migratetype);
 	spin_unlock(&zone->lock);
@@ -2257,7 +2268,7 @@ void free_hot_cold_page(struct page *page, bool cold)
 	set_pcppage_migratetype(page, migratetype);
 	//page->indext에 migratetype을 설정
 	local_irq_save(flags);
-	__count_vm_event(PGFREE);//PGFREE(page free?)라는 이벤트를 증가
+	__count_vm_event(PGFREE);//PGFREE(page free?)라는 이벤트 횟수(?)를 증가
 
 	/*
 	 * We only track unmovable, reclaimable and movable on pcp lists.
@@ -2266,8 +2277,9 @@ void free_hot_cold_page(struct page *page, bool cold)
 	 * areas back if necessary. Otherwise, we may have to free
 	 * excessively into the page allocator
 	 */
+	// 커널이 메모리 회수 시스템을 가동시킬 때 페이지 블럭들을 스캔하면서 각 페이지블럭에서 isolation을 진행할 때 잠시 MIGRATE_ISOLATE 타입으로 지정하여 관리한다.
 	if (migratetype >= MIGRATE_PCPTYPES) {
-		if (unlikely(is_migrate_isolate(migratetype))) {
+		if (unlikely(is_migrate_isolate(migratetype))) { // isolate 타입인 경우에 pcp로 보내지 않고 바로 버디로 보낸다.
 			free_one_page(zone, page, pfn, 0, migratetype);
 			goto out;
 		}

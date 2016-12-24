@@ -260,8 +260,8 @@ static inline void drain_zonestat(struct zone *zone,
 static inline void __mod_zone_freepage_state(struct zone *zone, int nr_pages,
 					     int migratetype)
 {
-	__mod_zone_page_state(zone, NR_FREE_PAGES, nr_pages);
-	if (is_migrate_cma(migratetype))
+	__mod_zone_page_state(zone, NR_FREE_PAGES, nr_pages); // zone의 상태를 업데이트 NR_FREE_PAGES 인덱스에다가 nr_pages 만큼 더해줌
+	if (is_migrate_cma(migratetype)) // CMA 타입인 경우
 		__mod_zone_page_state(zone, NR_FREE_CMA_PAGES, nr_pages);
 }
 
