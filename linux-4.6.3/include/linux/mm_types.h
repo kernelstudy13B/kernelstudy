@@ -138,6 +138,7 @@ struct page {
 		/* Tail pages of compound page */
 		struct {
 			unsigned long compound_head; /* If bit zero is set */
+			
 
 			/* First tail page only */
 #ifdef CONFIG_64BIT

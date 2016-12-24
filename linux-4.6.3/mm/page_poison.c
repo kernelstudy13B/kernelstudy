@@ -159,18 +159,20 @@ static void unpoison_pages(struct page *page, int n)
 
 void kernel_poison_pages(struct page *page, int numpages, int enable)
 {
+	//poison : 보통 의미없는 값을 0으로 하면 이 값이 누가 접근했는지 인식하기 힘든 단점이 있으므로 poison이라는 특정 값을 넣음. 여기서는 free page인지를 확인하기 위해 poison을 다룸
 	if (!page_poisoning_enabled())
 		return;
 
 	if (enable)
-		unpoison_pages(page, numpages);
+		unpoison_pages(page, numpages);//poison 값 클리어
 	else
-		poison_pages(page, numpages);
+		poison_pages(page, numpages); //poison 값 설정, 현시점에서 enable은 0
 }
 
 #ifndef CONFIG_ARCH_SUPPORTS_DEBUG_PAGEALLOC
 void __kernel_map_pages(struct page *page, int numpages, int enable)
 {
 	/* This function does nothing, all work is done via poison pages */
+	//의미없는 함수. 이 함수내에서의 모드 작업이 poison pages를 경유한다
 }
 #endif

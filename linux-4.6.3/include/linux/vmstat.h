@@ -31,6 +31,7 @@ DECLARE_PER_CPU(struct vm_event_state, vm_event_states);
  * vm counters are allowed to be racy. Use raw_cpu_ops to avoid the
  * local_irq_disable overhead.
  */
+//vm counter들은 racy하도록 되어있다. local_irq_disable 오버헤드를 방지하기위해raw_cpu_ops를 사용
 static inline void __count_vm_event(enum vm_event_item item)
 {
 	raw_cpu_inc(vm_event_states.event[item]);

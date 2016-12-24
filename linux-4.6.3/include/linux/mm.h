@@ -405,10 +405,11 @@ static inline int pmd_devmap(pmd_t pmd)
 /*
  * Drop a ref, return true if the refcount fell to zero (the page has no users)
  */
+//refcount가 zero가 된다면 true를 리턴
 static inline int put_page_testzero(struct page *page)
 {
-	VM_BUG_ON_PAGE(page_ref_count(page) == 0, page);
-	return page_ref_dec_and_test(page);
+	VM_BUG_ON_PAGE(page_ref_count(page) == 0, page);//현재 상태에서 non-refcounted이면 안됨
+	return page_ref_dec_and_test(page);//fell to zero 부분
 }
 
 /*

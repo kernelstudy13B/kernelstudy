@@ -284,6 +284,7 @@ static inline void reset_deferred_meminit(pg_data_t *pgdat)
 }
 
 /* Returns true if the struct page for the pfn is uninitialised */
+//페이지 프레임 넘버를 위한 page 구조가 초기화되어 있지 않다면 true를 리턴.
 static inline bool __meminit early_page_uninitialised(unsigned long pfn)
 {
 	if (pfn >= NODE_DATA(early_pfn_to_nid(pfn))->first_deferred_pfn)
@@ -823,6 +824,7 @@ static inline int free_pages_check(struct page *page)
 #endif
 	if (unlikely(bad_reason)) {
 		bad_page(page, bad_reason, bad_flags);
+//위 if문을 거쳐가서 bad_reason이 NULL이 아니면 bad_page로 설정
 		return 1;
 	}
 	page_cpupid_reset_last(page);
@@ -940,21 +942,25 @@ static int free_tail_pages_check(struct page *head_page, struct page *page)
 		goto out;
 	}
 	switch (page - head_page) {
-	case 1:
+	case 1://page가 2개인 compound 페이지
 		/* the first tail page: ->mapping is compound_mapcount() */
 		if (unlikely(compound_mapcount(page))) {
+			//페이지가 2개인 compound일떄 맵카운트가 제로이면 bad_page
 			bad_page(page, "nonzero compound_mapcount", 0);
 			goto out;
 		}
 		break;
-	case 2:
+	case 2://page가 3개인 compound 페이지
 		/*
 		 * the second tail page: ->mapping is
 		 * page_deferred_list().next -- ignore value.
+		 두번쨰 tail page, ->mapping이 세번쨰 페이지의 mapping의 value를 무시한다
 		 */
+		//mapping : 페이지 프레임에 속한 공간과의 mapping을 의미
 		break;
 	default:
 		if (page->mapping != TAIL_MAPPING) {
+			//compound 페이지의 경우라면 TAIL_MAPPING을 전제해야한다.???
 			bad_page(page, "corrupted mapping in tail page", 0);
 			goto out;
 		}
@@ -962,16 +968,18 @@ static int free_tail_pages_check(struct page *head_page, struct page *page)
 	}
 	if (unlikely(!PageTail(page))) {
 		bad_page(page, "PageTail not set", 0);
+		//PageTail이 compound 페이지에 세팅이 되어있는가를 확인
 		goto out;
 	}
 	if (unlikely(compound_head(page) != head_page)) {
 		bad_page(page, "compound_head not consistent", 0);
+		//매개변수 head_page와 compound page의 헤드페이지의 확인결과 일치유무를 확인
 		goto out;
 	}
 	ret = 0;
 out:
 	page->mapping = NULL;
-	clear_compound_head(page);
+	clear_compound_head(page);//compound 페이지의 헤드부분을 clear
 	return ret;
 }
 
@@ -1056,6 +1064,8 @@ void __meminit reserve_bootmem_region(phys_addr_t start, phys_addr_t end)
 
 static bool free_pages_prepare(struct page *page, unsigned int order)
 {
+	//페이지들을 버디 시스템으로 free 하기 전에 각 페이지의 플래그를 확인, 확인하여 
+	//bad 요건이 있는지 모드 확인, 리턴이 true면 이상이 없는 page임
 	bool compound = PageCompound(page);
 	int i, bad = 0;
 
@@ -1065,21 +1075,26 @@ static bool free_pages_prepare(struct page *page, unsigned int order)
 	trace_mm_page_free(page, order);
 	kmemcheck_free_shadow(page, order);
 	kasan_free_pages(page, order);
+	//kasan : kernal address sanitizer - 동적 메모리 에러 디덱터
 
-	if (PageAnon(page))
+	if (PageAnon(page))//page mapping anonymous
+	//anonymous : 파일에서 읽혀지지도 않고 쓰여지지도 않을 페이지
 		page->mapping = NULL;
-	bad += free_pages_check(page);
+	bad += free_pages_check(page);//첫 페이지가 bad인지를체크
 	for (i = 1; i < (1 << order); i++) {
 		if (compound)
+	//compound 페이지 구성 확인을 위해 각 페이지 조사
+	//compound 페이지 : 연속되어 있는 복수개의 페이지에 따라 체크??
 			bad += free_tail_pages_check(page, page + i);
 		bad += free_pages_check(page + i);
 	}
 	if (bad)
-		return false;
+		return false;//bad page가 하나라도 있으면 false, 즉 하나도 없어야 page 증명이 이루어짐
 
 	reset_page_owner(page, order);
+	//2^order 페이지들에 해당하는 각각 page_ext를 찾아 owner 플래그를 클리어
 
-	if (!PageHighMem(page)) {
+	if (!PageHighMem(page)) {//Page가 HighMem이 아니면 debugging을 위한 과정
 		debug_check_no_locks_freed(page_address(page),
 					   PAGE_SIZE << order);
 		debug_check_no_obj_freed(page_address(page),
@@ -1096,7 +1111,8 @@ static void __free_pages_ok(struct page *page, unsigned int order)
 {
 	unsigned long flags;
 	int migratetype;
-	unsigned long pfn = page_to_pfn(page);
+	
+
 
 	if (!free_pages_prepare(page, order))
 		return;
@@ -1115,17 +1131,18 @@ static void __init __free_pages_boot_core(struct page *page,
 	struct page *p = page;
 	unsigned int loop;
 
-	prefetchw(p);
+	prefetchw(p);//페이지 처리전 프로세서에게 미리 판독시킴?...
 	for (loop = 0; loop < (nr_pages - 1); loop++, p++) {
-		prefetchw(p + 1);
+		prefetchw(p + 1);//현재 클리어 되기 직전인 p 다음의 페이지를 prefetch
 		__ClearPageReserved(p);
-		set_page_count(p, 0);
+		set_page_count(p, 0);//clear page에 대한 count를 0으로 바꿔줌
 	}
 	__ClearPageReserved(p);
-	set_page_count(p, 0);
+	set_page_count(p, 0);//마지막 page에 대한 작업들
 
 	page_zone(page)->managed_pages += nr_pages;
-	set_page_refcounted(page);
+	//page_zone 함수의 리턴타입이 구조체에 대한 주소값.
+	set_page_refcounted(page);//인자로 들어온 page를 refcounted(set_page_count를 1로 바꿈)로 정의함
 	__free_pages(page, order);
 }
 
@@ -1184,7 +1201,7 @@ static inline bool __meminit meminit_pfn_in_nid(unsigned long pfn, int node,
 void __init __free_pages_bootmem(struct page *page, unsigned long pfn,
 							unsigned int order)
 {
-	if (early_page_uninitialised(pfn))
+	if (early_page_uninitialised(pfn))//pfn을 위한 struct page가 초기화되어있지 않다면 true 리턴, 즉 struct page에 대한 예외처리
 		return;
 	return __free_pages_boot_core(page, pfn, order);
 }
@@ -2219,6 +2236,8 @@ void mark_free_pages(struct zone *zone)
 /*
  * Free a 0-order page
  * cold == true ? free a cold page : free a hot page
+ free할 0-order 페이지를 Per-cpu 페이지 프레임 캐시로 회수한다
+ 이함수를 호출하는 __free_pages 단계에서 cold는 false로 정의되었으므로 hot page에 대한 free를 시도한다.
  */
 void free_hot_cold_page(struct page *page, bool cold)
 {
@@ -2228,13 +2247,17 @@ void free_hot_cold_page(struct page *page, bool cold)
 	unsigned long pfn = page_to_pfn(page);
 	int migratetype;
 
-	if (!free_pages_prepare(page, 0))
+	if (!free_pages_prepare(page, 0))//free page를 증명하는 단계, 증명이 되지 않으면 루틴을 처리하지 않고 빠져나간다
+		//함수내에서 page를 증명하는 과정중에 bad page가 하나라도 있으면 이함수는 여기서 리턴이 된다
 		return;
 
 	migratetype = get_pfnblock_migratetype(page, pfn);
+	//migratetype : 각 페이지는 mobility 속성을 표현하기 위한 migration 타입을 가지고 있다. 가능하면 같은 속성을 가진 페이지들끼리 뭉쳐 있도록 하여 연속된 메모리의 파편화를 억제, 최대한 커다란연속된 free 메모리를 유지하고자하는 목적으로 버디 시스템에 설계
+	//pfnblock : migratetype을 위해 뭉쳐져 있는 페이지들의 단위
 	set_pcppage_migratetype(page, migratetype);
+	//page->indext에 migratetype을 설정
 	local_irq_save(flags);
-	__count_vm_event(PGFREE);
+	__count_vm_event(PGFREE);//PGFREE(page free?)라는 이벤트를 증가
 
 	/*
 	 * We only track unmovable, reclaimable and movable on pcp lists.
@@ -3466,10 +3489,16 @@ unsigned long get_zeroed_page(gfp_t gfp_mask)
 EXPORT_SYMBOL(get_zeroed_page);
 
 void __free_pages(struct page *page, unsigned int order)
+	//사용 완료된 2^order 페이지인 경우 free를 하되 order가 0이라면 Per CPU 페이지프레임캐시로의 free를 시도...
 {
-	if (put_page_testzero(page)) {
+	if (put_page_testzero(page)) 
+	//refcounted라는 것을 표시하기 위해 page의 _count 필드가 1이었던것을 다시 0으로 fell, 0이라면 이 함수는 내부함수를 거쳐 true를 리턴하여 조건을 만족한다
+	{
 		if (order == 0)
-			free_hot_cold_page(page, false);
+			free_hot_cold_page(page, false)
+	//hot : 리스트 검색에서 앞부분에 놓은 페이지들,다시 할당되어 사용될 가능성이 높음
+	//cold : 리스트 검색에서 뒷부분에 놓인 페이지들, order가 통합되어 점점 상위 order로 ㄷ올라갈 가능성이 높음.
+	//이 과정에서는order가 0이면 무조건 hot page로 간주
 		else
 			__free_pages_ok(page, order);
 	}
@@ -6858,6 +6887,7 @@ static inline unsigned long *get_pageblock_bitmap(struct zone *zone,
 {
 #ifdef CONFIG_SPARSEMEM
 	return __pfn_to_section(pfn)->pageblock_flags;
+	//migratetype에 대한 flag가 정의되있음
 #else
 	return zone->pageblock_flags;
 #endif /* CONFIG_SPARSEMEM */

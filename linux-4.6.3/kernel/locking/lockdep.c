@@ -4194,6 +4194,9 @@ static inline int not_in_range(const void* mem_from, unsigned long mem_len,
  * Called when kernel memory is freed (or unmapped), or if a lock
  * is destroyed or reinitialized - this code checks whether there is
  * any held lock in the memory range of <from> to <to>:
+
+ 커널 메모리가 freed되면(또는 매핑되어있지 않다면 또는 lock이 깨지거나 다시 초기화된다면
+ 이 고드는 from으로부터 to까지의 메모리 범위에서 지정된 lock이 있는지 없느지를 확인
  */
 void debug_check_no_locks_freed(const void *mem_from, unsigned long mem_len)
 {

@@ -60,6 +60,8 @@ static inline unsigned long ra_submit(struct file_ra_state *ra,
 /*
  * Turn a non-refcounted page (->_count == 0) into refcounted with
  * a count of one.
+ 카운트 1과 함께 refcounted로 non-refcounted page를 변환
+ non-refcounted page는 그 page의 _count 필드가 0인것을 의미
  */
 static inline void set_page_refcounted(struct page *page)
 {
