@@ -483,26 +483,30 @@ static inline void free_area_high(unsigned long pfn, unsigned long end)
 static void __init free_highpages(void)
 {
 #ifdef CONFIG_HIGHMEM
-	unsigned long max_low = max_low_pfn;
+	unsigned long max_low = max_low_pfn;//max_low는 highmem과 lowmem의 경계
 	struct memblock_region *mem, *res;
 
 	/* set highmem page free */
-	for_each_memblock(memory, mem) {
+	for_each_memblock(memory, mem) {//memblock 수 만큼 루프
 		unsigned long start = memblock_region_memory_base_pfn(mem);
 		unsigned long end = memblock_region_memory_end_pfn(mem);
 
 		/* Ignore complete lowmem entries */
 		if (end <= max_low)
 			continue;
+		//memblock 엔트리가 lowmem이면 무시
 
 		if (memblock_is_nomap(mem))
 			continue;
 
 		/* Truncate partial highmem entries */
+		//highmem entry 줄임,memblock 엔트리가 경계에 걸쳐있다면 lowmem 영역을 무시
 		if (start < max_low)
 			start = max_low;
 
 		/* Find and exclude any reserved regions */
+		//reserved된 부분을 찾고 제외시킴
+		//아래 if문을 통해 reserved 영역의 start, end 설정후 그 구간을 제외시킴
 		for_each_memblock(reserved, res) {
 			unsigned long res_start, res_end;
 
@@ -511,13 +515,17 @@ static void __init free_highpages(void)
 
 			if (res_end < start)
 				continue;
-			if (res_start < start)
+			if (res_start < start)/**/
 				res_start = start;
+			//reserved 영역이 highmem 시작부분보다 낮은 경우이므로 highmem의시작점으로 설정, 
 			if (res_start > end)
 				res_start = end;
 			if (res_end > end)
 				res_end = end;
 			if (res_start != start)
+			//reserved 영역이 highmem에 들어가있는 경우(이경우는 free_area_high가 두번호출?)
+			//**에서 memory memblock의 start가 reserved memblock의 start(res_start)보다 크다면 memory memblock의 start가 reserved memory의 start로 된다.
+			//
 				free_area_high(start, res_start);
 			start = res_end;
 			if (start == end)
@@ -525,6 +533,7 @@ static void __init free_highpages(void)
 		}
 
 		/* And now free anything which remains */
+		//남은 부분을 다 free
 		if (start < end)
 			free_area_high(start, end);
 	}
@@ -549,16 +558,16 @@ void __init mem_init(void)
 
 	/* this will put all unused low memory onto the freelists */
 	free_unused_memmap(); // sparse or dicontig 메모리 모델에서 메모리 사이에 사용하지않는 공간이 상당히 클 수 있기 때문에 메모리 낭비를 막기위해서 미사용 공간에 대한 mep_map[]을 페이지 단위로 reserve memblock에서 free 시킨다.
-	free_all_bootmem(); // 161210
+	free_all_bootmem(); // 161210 ~ 170107
 
 #ifdef CONFIG_SA1111
 	/* now that our DMA memory is actually so designated, we can free it */
 	free_reserved_area(__va(PHYS_OFFSET), swapper_pg_dir, -1, NULL);
 #endif
 
-	free_highpages();
+	free_highpages();//highmem 메모리 영역을 모두 buddy 메모리 할당자의 free 페이지로 이관등록.
 
-	mem_init_print_info(NULL);
+	mem_init_print_info(NULL);//메모리 영역에 대한 자료 출력
 
 #define MLK(b, t) b, t, ((t) - (b)) >> 10
 #define MLM(b, t) b, t, ((t) - (b)) >> 20
@@ -630,6 +639,7 @@ void __init mem_init(void)
 		 * On a machine this small we won't get
 		 * anywhere without overcommit, so turn
 		 * it on by default.
+		overcommit 방지를 위해 디폴트로 설정
 		 */
 		sysctl_overcommit_memory = OVERCOMMIT_ALWAYS;
 	}

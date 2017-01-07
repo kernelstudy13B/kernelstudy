@@ -630,7 +630,7 @@ static inline void rmv_page_order(struct page *page)
  */
 static inline int page_is_buddy(struct page *page, struct page *buddy,
 							unsigned int order)
-{
+{//
 	if (!pfn_valid_within(page_to_pfn(buddy)))
 		return 0;
 
@@ -704,7 +704,8 @@ static inline void __free_one_page(struct page *page,
 	VM_BUG_ON_PAGE(page->flags & PAGE_FLAGS_CHECK_AT_PREP, page); // 페이지가 준비가 안되있으면 버그
 
 	VM_BUG_ON(migratetype == -1); // 마이그래트 타입이 -1 이면 버그
-	if (likely(!is_migrate_isolate(migratetype))) //migratetype이 isolate타입이 아닌경우
+	if (likely(!is_migrate_isolate(migratetype))) //migratetype이 isolate타입이 아닌경우(isolation : 커널이 메모리 회수 시스템 가동 시 페이지 블럭들을 스캔하여 각 페이지 블럭에서 isolation을 진쟁할때 잠시 이 타입으로 지정하여 관리)
+
 		__mod_zone_freepage_state(zone, 1 << order, migratetype);
 		// 1 << order 값을
 		// per_cpu_pageset->vm_stat_diff에 변화량을 유지하다가 특정값을 넘어서면 아래를 수행
@@ -723,8 +724,11 @@ static inline void __free_one_page(struct page *page,
 continue_merging:
 	while (order < max_order - 1) {//초기 order는 0
 		buddy_idx = __find_buddy_index(page_idx, order);
-		buddy = page + (buddy_idx - page_idx);
+		buddy = page + (buddy_idx - page_idx);//페이지 인덱스를 기준으로 버디 구조체의 주소를 구함
+		//페이지 인덱스를 기준으로 페이지 구조체의 주소를 얻어온다.
 		if (!page_is_buddy(page, buddy, order))
+			//버디 시스템에 이미 짝을 이루는 버디 페이지가 존재하지 않다면 더이상 결합할 필요가 없으므로 빠져나온다
+			//페이지와 버디를 합칠수 있는가를 따지는 함수
 			goto done_merging;
 		/*
 		 * Our buddy is free or it is CONFIG_DEBUG_PAGEALLOC guard page,
@@ -757,6 +761,8 @@ continue_merging:
 		 *
 		 * We don't want to hit this code for the more frequent
 		 * low-order merging.
+		 조건문이 참이라면 order가 pageblock_order와 크거나 같다.
+		isolate 페이지블록과 노멀 페이지블록에서 프리페이지간 merge를 막아야함, 이 두 페이지블록없이 페이지블록 isolation은 옳지않은 프리페이지를 만들수있다. 
 		 */
 		if (unlikely(has_isolate_pageblock(zone))) {
 			int buddy_mt;
@@ -768,6 +774,9 @@ continue_merging:
 			if (migratetype != buddy_mt
 					&& (is_migrate_isolate(migratetype) ||
 						is_migrate_isolate(buddy_mt)))
+				//migratetype그리고 buddy_mt가 isolate여야 하고
+				//두개의 mt 타입이 다르면
+				//isolate : 메모리가 free되기 이전의 상태?
 				goto done_merging;
 		}
 		max_order++;
@@ -775,6 +784,7 @@ continue_merging:
 	}
 
 done_merging:
+	//더이상 상위의 order에서 merge가 안되므로 page에 대한 order를 지정
 	set_page_order(page, order);
 
 	/*
@@ -784,6 +794,7 @@ done_merging:
 	 * that is happening, add the free page to the tail of the list
 	 * so it's less likely to be used soon and more likely to be merged
 	 * as a higher order page
+	 가장 큰 유효 페이지가 아니라면 그다음 가장 큰 오더의 버디페이지가 free인지를 확인해야됨. 만약 free라면 free되는 페이지는 곧 합쳐질 것이다. 이 경우에 free page를 리스트의 뒷부분에 놓는다.
 	 */
 	//order가 MAX-ORDER-2보다 작고 buddy 페이지가 valid 영역에 있는 경우
 	if ((order < MAX_ORDER-2) && pfn_valid_within(page_to_pfn(buddy))) {
@@ -796,12 +807,13 @@ done_merging:
 		if (page_is_buddy(higher_page, higher_buddy, order + 1)) {
 			list_add_tail(&page->lru,
 				&zone->free_area[order].free_list[migratetype]);
-			//higher_page가 order+1슬롯에서 짝이되는 버디 페이지가 존재하는 경우 order 슬롯의 후미에 페이지를 추가
+			//higher_page가 order+1슬롯에서 짝이되는 버디 페이지가 존재하는 경우 order 슬롯의 후미에 페이지를 추가(콜드 페이지로 등록)
 			goto out;
 		}
 	}
 
 	list_add(&page->lru, &zone->free_area[order].free_list[migratetype]);
+	//핫페이지 즉, 리스트의 앞부분에 놓이는 다시 사용될 확률이 높은 페이지로 배치된다
 out:
 	zone->free_area[order].nr_free++;//nr_free 증가
 }
@@ -2283,16 +2295,16 @@ void free_hot_cold_page(struct page *page, bool cold)
 			free_one_page(zone, page, pfn, 0, migratetype);
 			goto out;
 		}
-		migratetype = MIGRATE_MOVABLE;
+		migratetype = MIGRATE_MOVABLE;//user 어플리케이션등에서 할당됨.
 	}
-
+	//pcp에 대한 페이지 배치
 	pcp = &this_cpu_ptr(zone->pageset)->pcp;
 	if (!cold)
 		list_add(&page->lru, &pcp->lists[migratetype]);
 	else
 		list_add_tail(&page->lru, &pcp->lists[migratetype]);
 	pcp->count++;
-	if (pcp->count >= pcp->high) {
+	if (pcp->count >= pcp->high) {//pcp 관리카운터가 제한수를 넘기면
 		unsigned long batch = READ_ONCE(pcp->batch);
 		free_pcppages_bulk(zone, batch, pcp);
 		pcp->count -= batch;
@@ -3513,6 +3525,7 @@ void __free_pages(struct page *page, unsigned int order)
 	//이 과정에서는order가 0이면 무조건 hot page로 간주
 		else
 			__free_pages_ok(page, order);
+		//order가 0이 아닌경우면 pcp와 무관해지므로 별도의 free_one_page를 호출할 수 있는 함수를 호출.
 	}
 }
 
@@ -6262,7 +6275,7 @@ unsigned long free_reserved_area(void *start, void *end, int poison, char *s)
 	start = (void *)PAGE_ALIGN((unsigned long)start);
 	end = (void *)((unsigned long)end & PAGE_MASK);
 	for (pos = start; pos < end; pos += PAGE_SIZE, pages++) {
-		if ((unsigned int)poison <= 0xFF)
+		if ((unsigned int)poison <= 0xFF)//메모리 변동확인을 위해 삽입한 값
 			memset(pos, poison, PAGE_SIZE);
 		free_reserved_page(virt_to_page(pos));
 	}
@@ -6278,10 +6291,10 @@ EXPORT_SYMBOL(free_reserved_area);
 #ifdef	CONFIG_HIGHMEM
 void free_highmem_page(struct page *page)
 {
-	__free_reserved_page(page);
-	totalram_pages++;
-	page_zone(page)->managed_pages++;
-	totalhigh_pages++;
+	__free_reserved_page(page);//이와 같은 free_xxx_page의 함수는 최종적으로 __free_one_page를 호출
+	totalram_pages++;//전체 구간의 영역이 늘어남
+	page_zone(page)->managed_pages++;//zone이 관리할 page 추가됨
+	totalhigh_pages++;//highmem의 구간이 늘어났으므로 
 }
 #endif
 

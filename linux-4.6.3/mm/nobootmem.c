@@ -152,6 +152,7 @@ static unsigned long __init free_low_memory_core_early(void)
 	// 모든 free lowmem 영역을 모두 버디 시스템의 free_list에 이관 등록한다.
 
 #ifdef CONFIG_ARCH_DISCARD_MEMBLOCK
+	//reserve & memory memblock의 관리배열을 더이상 사용하지 않음.
 	{
 		phys_addr_t size;
 
