@@ -3879,13 +3879,17 @@ static struct notifier_block slab_memory_callback_nb = {
  * that may be pointing to the wrong kmem_cache structure.
  */
 
+// kmem_cache object를 새로 할당 받은 주소에 인수로 전달 받은 static_cache를 obj_size 만큼 복사한다.
+// 그런 후 이 캐시를 활성화 시키고 slub 캐시 운용을 위해 slab_caches 리스트에 추가 한다.
 static struct kmem_cache * __init bootstrap(struct kmem_cache *static_cache)
 {
 	int node;
 	struct kmem_cache *s = kmem_cache_zalloc(kmem_cache, GFP_NOWAIT);
+	// kmem_cache object를 할당 받아 온다.
 	struct kmem_cache_node *n;
 
 	memcpy(s, static_cache, kmem_cache->object_size);
+	// static_cache(인자)를 똑같이 s에 복사
 
 	/*
 	 * This runs very early, and only the boot processor is supposed to be
@@ -3893,6 +3897,9 @@ static struct kmem_cache * __init bootstrap(struct kmem_cache *static_cache)
 	 * IPIs around.
 	 */
 	__flush_cpu_slab(s, smp_processor_id());
+	// early 부트업 과정에 있으므로 실제 다른 cpu로의 IPI call을 할 수 없으므로 local cpu에 대해서만 flush를 하게된다.
+	// IPI : multicore 간에 서로 정보를 주고 받기 위한 인터럽트
+	// flush : 전부 지운다. 여기서는 초기화라고 보면 될듯
 	for_each_kmem_cache_node(s, node, n) {
 		struct page *p;
 
@@ -3904,50 +3911,80 @@ static struct kmem_cache * __init bootstrap(struct kmem_cache *static_cache)
 			p->slab_cache = s;
 #endif
 	}
+	// kmem_cache { kmem_cache_node { partial, full 의 노드들이 kmem_cache를 가리키게함} } 
 	slab_init_memcg_params(s);
+	// flush 했으니 다시 memch parameter들 다시 설정
 	list_add(&s->list, &slab_caches);
+	// 전역 slab_caches에 할당 받은 캐시를 선두에 추가한다.
 	return s;
 }
-
+// slub 할당자에 대한 초기화 
 void __init kmem_cache_init(void)
 {
 	static __initdata struct kmem_cache boot_kmem_cache,
 		boot_kmem_cache_node;
+	// 후에 kmem_cache와 kmem_cache_node라는 이름의 캐시가 만들어지는 경우 사용하지 않게된다.
+	// struct kmem_cache 안에 struct kmem_cache_node 포인터 배열이 있다.
+	// struct kmem_cache kmem_cache_node는 저 구조체 할당을 위한 할당자이다.
 
-	if (debug_guardpage_minorder())
+	if (debug_guardpage_minorder()) // kernel 파라미터 debug_guardpage_minorder가 설정되 있으면
 		slub_max_order = 0;
 
 	kmem_cache_node = &boot_kmem_cache_node;
 	kmem_cache = &boot_kmem_cache;
 
+	// kmem_cache : global 하게 접근 가능한 할당자?
+	// kmem_cache_node : cpu 당 존재하는 할당자
+	// kmem_cache가 kmem_cache_node 들을 포함?
+
 	create_boot_cache(kmem_cache_node, "kmem_cache_node",
 		sizeof(struct kmem_cache_node), SLAB_HWCACHE_ALIGN);
+	// kmem_cache_node 캐시를 만듬 
+	// kmem_cache_node를 할당하기 위한 slab 할당자 생성
 
 	register_hotmemory_notifier(&slab_memory_callback_nb);
+	// hotmemory_notifier로 slab_memory_callback_nb를 등록
+	// hotmemory라는 말은 memory hotplug 인듯
 
 	/* Able to allocate the per node structures */
 	slab_state = PARTIAL;
+	// PARTIAL : 중간 상태(slub 캐시는 못 만들고, 이미 만들어진 slub 캐시에서 할당받아 이용가능하다.)
+	// UP : 사용 가능 상태(전부는 못 쓰고 거의 다씀)
+	// DOWN : 사용 불가 상태
 
 	create_boot_cache(kmem_cache, "kmem_cache",
 			offsetof(struct kmem_cache, node) +
 				nr_node_ids * sizeof(struct kmem_cache_node *),
 		       SLAB_HWCACHE_ALIGN);
+	// kmem_cache를 생성
+	// struct kmem_cache 구조체 크기에서 node 변수 전까지의 크기 
+	// + nr_node_ids * (struct kmem_cache_node 포인터) 를 할당하기위한 slub 할당자 생성
 
 	kmem_cache = bootstrap(&boot_kmem_cache);
-
+	// boot_kmem_cache를 복사해 kmem_cache에 넣는다.?
+	// 위에서 boot_kmem_cache에 이런저런 초기화를 한 후에 
+	// 이 함수내에서 내용을 똑같이 복사후 다시 이런저런 초기화 후 전역 slab_caches에 등록하고 리턴
+	
 	/*
 	 * Allocate kmem_cache_node properly from the kmem_cache slab.
 	 * kmem_cache_node is separately allocated so no need to
 	 * update any list pointers.
 	 */
 	kmem_cache_node = bootstrap(&boot_kmem_cache_node);
+	// boot_kmem_cache_node를 복사해 kmem_cache_node에 넣는다.?
 
 	/* Now we can use the kmem_cache to allocate kmalloc slabs */
-	setup_kmalloc_cache_index_table();
-	create_kmalloc_caches(0);
+	setup_kmalloc_cache_index_table(); // slub 할당자에 이용할 메모리 덩어리들의 사이즈 index 테이블을 생성
+	// 170107
+	
+	create_kmalloc_caches(0); 
+	// kmalloc-<size> 이름의 slub 캐시를 사이즈별로 미리 생성한다.
+	// size=8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192 이며, 조건에 따라 96, 192가 추가된다
 
 #ifdef CONFIG_SMP
 	register_cpu_notifier(&slab_notifier);
+	// cpu notifier에 slab notifier로 등록
+	// CPU HOTPLUG때 이용될 것으로 추정 
 #endif
 
 	pr_info("SLUB: HWalign=%d, Order=%d-%d, MinObjects=%d, CPUs=%d, Nodes=%d\n",
@@ -3996,7 +4033,7 @@ int __kmem_cache_create(struct kmem_cache *s, unsigned long flags)
 {
 	int err;
 
-	err = kmem_cache_open(s, flags);
+	err = kmem_cache_open(s, flags); // 초기화 
 	if (err)
 		return err;
 

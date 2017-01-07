@@ -138,6 +138,10 @@ void slab_init_memcg_params(struct kmem_cache *s)
 	s->memcg_params.is_root_cache = true;
 	INIT_LIST_HEAD(&s->memcg_params.list);
 	RCU_INIT_POINTER(s->memcg_params.memcg_caches, NULL);
+	// RCU : rcu는 항상 최신버전을 준다. 
+	// read 할 때는 현재 버전의 데이터를 참조하고
+	// write 할 때는 다음 버전의 데이터를 생성하고 
+	// 참조 값이 0이 되면 구 버전의 데이터는 삭제한다.
 }
 
 static int init_memcg_params(struct kmem_cache *s,
@@ -775,16 +779,20 @@ void __init create_boot_cache(struct kmem_cache *s, const char *name, size_t siz
 	s->name = name;
 	s->size = s->object_size = size;
 	s->align = calculate_alignment(flags, ARCH_KMALLOC_MINALIGN, size);
+	// 단위 align 값 설정
 
-	slab_init_memcg_params(s);
+	slab_init_memcg_params(s); 
+	// memcg(Memory resource controller, memory cgroup)에 대한 파라미터들을 초기화한다.
 
 	err = __kmem_cache_create(s, flags);
+	// 요청한 slub 캐시를 생성한다.
 
 	if (err)
 		panic("Creation of kmalloc slab %s size=%zu failed. Reason %d\n",
 					name, size, err);
 
 	s->refcount = -1;	/* Exempt from merging for now */
+	// 아직 완전히 구성되지 않아서 레퍼런스 카운터 값에 -1을 대입한다.
 }
 
 struct kmem_cache *__init create_kmalloc_cache(const char *name, size_t size,
