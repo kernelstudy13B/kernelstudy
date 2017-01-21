@@ -491,8 +491,8 @@ static void __init mm_init(void)
 	 */
 	page_ext_init_flatmem(); // page_ext 구조체에 대한 할당과 초기화
 	mem_init();
-	kmem_cache_init();
-	// slab : 원래 있던 할당자, slub : 서버 환경 또는 메모리가 충분한 임베디드 환경, slob : 임베디드 환경
+	kmem_cache_init(); // slub 할당자를 만들었다.(kmalloc_caches, 이제 kmalloc 사용가능)
+	// slab : 원래 있던 할당자, slub : 서버 환경 또는 메모리가 충분한 임베디드 환경, slob : 임베디드 환경, 우리는 slub을 기준으로 분석
 	percpu_init_late();
 	pgtable_init();
 	vmalloc_init();

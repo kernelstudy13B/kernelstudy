@@ -799,12 +799,14 @@ struct kmem_cache *__init create_kmalloc_cache(const char *name, size_t size,
 				unsigned long flags)
 {
 	struct kmem_cache *s = kmem_cache_zalloc(kmem_cache, GFP_NOWAIT);
-
+	// kmem_cache 캐시에서 slub object를 하나 할당 받는다.
+	
 	if (!s)
 		panic("Out of memory when creating slab %s\n", name);
 
-	create_boot_cache(s, name, size, flags);
-	list_add(&s->list, &slab_caches);
+	create_boot_cache(s, name, size, flags); 
+	// kmalloc_info의 name과 size를 이용해서 캐시를 생성
+	list_add(&s->list, &slab_caches); // 생성된 캐시를 slab_caches에 매달음 
 	s->refcount = 1;
 	return s;
 }
@@ -923,11 +925,22 @@ static struct {
 void __init setup_kmalloc_cache_index_table(void)
 {
 	int i;
+	// size_index_table은 이 함수위에 정의되어 있는 kmalloc_info 배열의 인덱스를 갖고 있음
+	// kmalloc_info는 kmalloc 시 할당할 메모리의 크기를 갖고 있음
 
 	BUILD_BUG_ON(KMALLOC_MIN_SIZE > 256 ||
 		(KMALLOC_MIN_SIZE & (KMALLOC_MIN_SIZE - 1)));
-
+	// index_table은 작은 캐시에 해당할때 이용하기 위한 것이므로
+	// KMALLOC_MIN_SIZE가 256바이트 보다 작아야한다.
+	// rpi2 : KMALLOC_MIN_SIZE : 64, KMALLOC_SHIFT_LOW : 6
+	// 
+	// cache line이 64byte니 이보다 작은 크기의 메모리 할당 요청이 들어와도
+	// 64byte로 키워서 할당 받게함 (i=8 ~ 64인 경우)
+	//
+	// i = 72 ~ 96 인 경우 128 byte로 할당 받게함, 104 ~ 128은 원래 128 byte를 할당
+	// i = 136 ~ 192 인 경우 256 byte로 할당 받게함
 	for (i = 8; i < KMALLOC_MIN_SIZE; i += 8) {
+		// size_index[(i-1)/8] = KMALLOC_SHIFT_LOW; 이짓을 함
 		int elem = size_index_elem(i);
 
 		if (elem >= ARRAY_SIZE(size_index))
@@ -939,6 +952,7 @@ void __init setup_kmalloc_cache_index_table(void)
 		/*
 		 * The 96 byte size cache is not used if the alignment
 		 * is 64 byte.
+		 * i가 64 ~ 96인 경우 size_index = 7 대입
 		 */
 		for (i = 64 + 8; i <= 96; i += 8)
 			size_index[size_index_elem(i)] = 7;
@@ -971,6 +985,8 @@ void __init create_kmalloc_caches(unsigned long flags)
 {
 	int i;
 
+	// KMALLOC_SHIFT_LOW : 6 (64)
+	// KMALLOC_SHIFT_HIGH : 13 (8192)
 	for (i = KMALLOC_SHIFT_LOW; i <= KMALLOC_SHIFT_HIGH; i++) {
 		if (!kmalloc_caches[i])
 			new_kmalloc_cache(i, flags);
@@ -981,15 +997,21 @@ void __init create_kmalloc_caches(unsigned long flags)
 		 * earlier power of two caches
 		 */
 		if (KMALLOC_MIN_SIZE <= 32 && !kmalloc_caches[1] && i == 6)
+			// KMALLOC_MIN_SIZE가 32보다 작고 
+			// kmalloc_caches[1]이 설정되지 않았고
+			// i == 6 이면 96byte 크기의 캐시도 만들어 놓음
 			new_kmalloc_cache(1, flags);
 		if (KMALLOC_MIN_SIZE <= 64 && !kmalloc_caches[2] && i == 7)
+			// 위와 비슷하게 192byte 크기의 캐시를 만들어놓음
 			new_kmalloc_cache(2, flags);
 	}
 
 	/* Kmalloc array is now usable */
 	slab_state = UP;
+	// 지금부터 kmalloc array 캐시가 사용될 수 있다.
 
 #ifdef CONFIG_ZONE_DMA
+	// ZONE_DMA 설정이 되어있으면 ZONE_DMA을 위한 kmalloc_dma_caches를 만들어 놓는다.
 	for (i = 0; i <= KMALLOC_SHIFT_HIGH; i++) {
 		struct kmem_cache *s = kmalloc_caches[i];
 

@@ -3913,7 +3913,7 @@ static struct kmem_cache * __init bootstrap(struct kmem_cache *static_cache)
 	}
 	// kmem_cache { kmem_cache_node { partial, full 의 노드들이 kmem_cache를 가리키게함} } 
 	slab_init_memcg_params(s);
-	// flush 했으니 다시 memch parameter들 다시 설정
+	// flush 했으니 다시 memcg parameter들 다시 설정
 	list_add(&s->list, &slab_caches);
 	// 전역 slab_caches에 할당 받은 캐시를 선두에 추가한다.
 	return s;
@@ -3923,7 +3923,8 @@ void __init kmem_cache_init(void)
 {
 	static __initdata struct kmem_cache boot_kmem_cache,
 		boot_kmem_cache_node;
-	// 후에 kmem_cache와 kmem_cache_node라는 이름의 캐시가 만들어지는 경우 사용하지 않게된다.
+	// slub cache를 만들기 위해 사용할 kmem_cache와 kmem_cache_node를 구성한다. 
+	// 후에 kmem_cache와 kmem_cache_node라는 이름의 캐시가 만들어지는 경우 boot_kmem_cache와 boot_kmem_cache_node는 사용하지 않게된다.
 	// struct kmem_cache 안에 struct kmem_cache_node 포인터 배열이 있다.
 	// struct kmem_cache kmem_cache_node는 저 구조체 할당을 위한 할당자이다.
 
@@ -3975,7 +3976,6 @@ void __init kmem_cache_init(void)
 
 	/* Now we can use the kmem_cache to allocate kmalloc slabs */
 	setup_kmalloc_cache_index_table(); // slub 할당자에 이용할 메모리 덩어리들의 사이즈 index 테이블을 생성
-	// 170107
 	
 	create_kmalloc_caches(0); 
 	// kmalloc-<size> 이름의 slub 캐시를 사이즈별로 미리 생성한다.
