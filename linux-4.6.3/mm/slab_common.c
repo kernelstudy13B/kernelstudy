@@ -397,13 +397,13 @@ kmem_cache_create(const char *name, size_t size, size_t align,
 	const char *cache_name;
 	int err;
 
-	get_online_cpus();
-	get_online_mems();
-	memcg_get_cache_ids();
+	get_online_cpus();//cpu hotplug를 하지 못하도록 lock
+	get_online_mems();//메모리에 대한 hotplug를 하지 못하도록 lock
+	memcg_get_cache_ids();//slub 커널 메모리 사용량을 제어하기 위해 read 세마포어 락을 사용하는 컨트롤러
 
 	mutex_lock(&slab_mutex);
 
-	err = kmem_cache_sanity_check(name, size);
+	err = kmem_cache_sanity_check(name, size);//유효성 검사
 	if (err) {
 		goto out_unlock;
 	}
@@ -413,14 +413,19 @@ kmem_cache_create(const char *name, size_t size, size_t align,
 	 * of all flags. We expect them to define CACHE_CREATE_MASK in this
 	 * case, and we'll just provide them with a sanitized version of the
 	 * passed flags.
+	 kmem_cache를 생성할때 유효한 플래그만을 통과시킴.
 	 */
 	flags &= CACHE_CREATE_MASK;
 
 	s = __kmem_cache_alias(name, size, align, flags, ctor);
+	//병합될 캐시를 찾은 경우 캐시 생성을 포기하고 alias캐시로 등록
+	//요청 캐시가 존재하면 루틴을 빠져나감
 	if (s)
 		goto out_unlock;
 
 	cache_name = kstrdup_const(name, GFP_KERNEL);
+	//name을 복제하고 cache_name으로 반환, 단 name에 rodata섹션이 있으면 그대로 name 반환
+	//string.h에 있는 strdup를 참고.(인자로 넘어온 문자열을 복사해서 리턴)
 	if (!cache_name) {
 		err = -ENOMEM;
 		goto out_unlock;

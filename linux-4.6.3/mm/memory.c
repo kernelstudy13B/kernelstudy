@@ -3956,6 +3956,7 @@ static struct kmem_cache *page_ptl_cachep;
 
 void __init ptlock_cache_init(void)
 {
+	//페이지 테이블의 spinlock에 사용할 ptlock 캐시 생성
 	page_ptl_cachep = kmem_cache_create("page->ptl", sizeof(spinlock_t), 0,
 			SLAB_PANIC, NULL);
 }

@@ -489,13 +489,16 @@ static void __init mm_init(void)
 	 * page_ext requires contiguous pages,
 	 * bigger than MAX_ORDER unless SPARSEMEM.
 	 */
+	//아래 세 함수가 비중이 가장 큼
 	page_ext_init_flatmem(); // page_ext 구조체에 대한 할당과 초기화
-	mem_init();
+	mem_init(); //buddy 할당자에 대한 초기화 수행
 	kmem_cache_init(); // slub 할당자를 만들었다.(kmalloc_caches, 이제 kmalloc 사용가능)
 	// slab : 원래 있던 할당자, slub : 서버 환경 또는 메모리가 충분한 임베디드 환경, slob : 임베디드 환경, 우리는 slub을 기준으로 분석
-	percpu_init_late();
+	percpu_init_late();//위 함수에서 slub 할당자가 활성화되고
+	//pcpu(percpu)_first_chunk와 pcpu_reserved_chunk에서 사용한 할당 map을 새로 할당받은 메모리에 복사.
 	pgtable_init();
 	vmalloc_init();
+	//per-cpu vmap_block_queue 및 per-cpu vfree_deferred 구조체 변수를 초기화 하고 전역 vmlist에 등록되어 있는 수 만큼 vmap_area 구조체를 할당받아 초기화하여 vmap_area에 추가
 	ioremap_huge_init();
 }
 
@@ -593,6 +596,8 @@ asmlinkage __visible void __init start_kernel(void) //called by head.S
 	 * time - but meanwhile we still have a functioning scheduler.
 	 */
 	sched_init();
+	//1. init 태스크가 사용할 cpu의 번호 할당, pid hash table과 타이머 인터럽트 벡터 초기화
+	//2. 스케줄러 관련 구조체 초기화
 	/*
 	 * Disable preemption - early bootup scheduling is extremely
 	 * fragile until we cpu_idle() for the first time.

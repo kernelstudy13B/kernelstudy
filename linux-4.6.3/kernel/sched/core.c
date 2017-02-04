@@ -7236,10 +7236,10 @@ void __init sched_init(void)
 	int i, j;
 	unsigned long alloc_size = 0, ptr;
 
-#ifdef CONFIG_FAIR_GROUP_SCHED
+#ifdef CONFIG_FAIR_GROUP_SCHED //normal process에 대한 그룹 스케줄링 활성화
 	alloc_size += 2 * nr_cpu_ids * sizeof(void **);
 #endif
-#ifdef CONFIG_RT_GROUP_SCHED
+#ifdef CONFIG_RT_GROUP_SCHED //real time process에 대한 그룹 스케줄링 활성화
 	alloc_size += 2 * nr_cpu_ids * sizeof(void **);
 #endif
 	if (alloc_size) {

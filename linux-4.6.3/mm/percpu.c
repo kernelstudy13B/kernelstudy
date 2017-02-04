@@ -299,9 +299,10 @@ static void *pcpu_mem_zalloc(size_t size)
 		return NULL;
 
 	if (size <= PAGE_SIZE)
-		return kzalloc(size, GFP_KERNEL);
+		return kzalloc(size, GFP_KERNEL);//kmalloc-MMU에 의해 가상주소로 전환된 물리주소 리턴
+	//kzalloc : kmalloc을 하되 zero로 초기화
 	else
-		return vzalloc(size);
+		return vzalloc(size);//vmalloc-큰 메모리 버퍼를 잡고싶고 물리적으로 메모리 영역이 연속적일 필요가 없을때 kmalloc대신 사용,단 vmalloc으로 할당되는 가상주소는 연속적임
 }
 
 /**
@@ -2362,16 +2363,22 @@ void __init percpu_init_late(void)
 
 	for (i = 0; (chunk = target_chunks[i]); i++) {
 		int *map;
-		const size_t size = PERCPU_DYNAMIC_EARLY_SLOTS * sizeof(map[0]);
+		const size_t size = PERCPU_DYNAMIC_EARLY_SLOTS * sizeof(map[0]);//4byte * ~~
+		//early에서 할당된 chunk에 대한 사이즈를 구함...?
+		//dynamic allocation이 추가되면서 chunk방식이 소개됨.
+		//기존 percpu 섹션의 내용이  각 cpu만큼의 메모리를 할당받아 사용되다가 chunk방식을 씀.
+		//numa 하나당 chunk??
 
 		BUILD_BUG_ON(size > PAGE_SIZE);
+		//BUILD_BUG_ON : 인자가 참일시 컴파일 에러
+		//BUG_ON : 시스템을 정지시킴
 
-		map = pcpu_mem_zalloc(size);
+		map = pcpu_mem_zalloc(size);//size가 PAGE_SIZE보다 커야하므로 kzmalloc으로만 할당.
 		BUG_ON(!map);
 
 		spin_lock_irqsave(&pcpu_lock, flags);
-		memcpy(map, chunk->map, size);
-		chunk->map = map;
+		memcpy(map, chunk->map, size);//chunk 안에 있는 map 필드를 현재 map을 복사
+		chunk->map = map;//다음을 위해 chunk->map이 map을 가르키게 함.
 		spin_unlock_irqrestore(&pcpu_lock, flags);
 	}
 }

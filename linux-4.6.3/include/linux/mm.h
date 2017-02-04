@@ -1660,8 +1660,9 @@ static inline void pte_lock_deinit(struct page *page) {}
 
 static inline void pgtable_init(void)
 {
-	ptlock_cache_init();
-	pgtable_cache_init();
+	//page->ptl : 페이지테이블에 대한 락의 정보가 들어있는 필드, 기존 slub은 spinlock을 위해서는 메모리가 낭비가 되기 때문에 ptl만을 위한 slub을 할당하기 위해 필요
+	ptlock_cache_init();//page->ptl에 사용하는 spinlock_t 타입용 slub 캐시 생성
+	pgtable_cache_init();//x86, arm에서는 빈 함수, arm과 x86에는페이지테이블에 대한 캐시를 필요로하지 않는다
 }
 
 static inline bool pgtable_page_ctor(struct page *page)
