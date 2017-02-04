@@ -7326,37 +7326,55 @@ void __init sched_init(void)
 #endif /* CONFIG_CGROUP_SCHED */
 
 	for_each_possible_cpu(i) {
-		struct rq *rq;
+		//시스템의 모든 possible cpu(사용가능한 cpu)의 런큐를 초기화
+		struct rq *rq;    //run queue
 
-		rq = cpu_rq(i);
+		rq = cpu_rq(i);//per-cpu에서 런큐를 가져와서 rq변수에 할당
 		raw_spin_lock_init(&rq->lock);
-		rq->nr_running = 0;
+		rq->nr_running = 0;// 런큐에 삽입 되어 있는 프로세스의 갯수를 0으로 초기화
 		rq->calc_load_active = 0;
+		//load average 활성화 여부 초기화
 		rq->calc_load_update = jiffies + LOAD_FREQ;
+		//런큐에 대한 주기 설정
+		//jiffies : 전역적 시스템 카운터, 리눅스 커널에서 가장 기본이 되는 시간값으로서 특정 클럭 단위로 값이 1씩 증가.
+		//LOAD_FREQ : 5초간격
+
 		init_cfs_rq(&rq->cfs);
 		init_rt_rq(&rq->rt);
 		init_dl_rq(&rq->dl);
+		//서븤 런큐와 런큐와의 관계를 나타내는 멤버변수도 초기화
 #ifdef CONFIG_FAIR_GROUP_SCHED
 		root_task_group.shares = ROOT_TASK_GROUP_LOAD;
+		//root_task_group이 사용할수 있는 cpu bandwidth를 결정하는 shares 값을 설정
+		//shares 멤버변수는 나중에 cpu bandwidth를 나눠가질때 비율 구하는 용도에 사용
 		INIT_LIST_HEAD(&rq->leaf_cfs_rq_list);
+		//cfs도 트리를 쓰므로 트리의 처음 헤드를 초기화
 		/*
 		 * How much cpu bandwidth does root_task_group get?
-		 *
+		 * root_task_group이 얼마나 cpu대역폭을 얻을수 있는가?
+
 		 * In case of task-groups formed thr' the cgroup filesystem, it
 		 * gets 100% of the cpu resources in the system. This overall
 		 * system cpu resource is divided among the tasks of
 		 * root_task_group and its child task-groups in a fair manner,
 		 * based on each entity's (task or task-group's) weight
 		 * (se->load.weight).
-		 *
+		 * cgroup 파일시스템을 통해 형성된 태스크그룹의 경우 시스템에서 시피유 100
+		 프로를 얻는다. 이러한 전반적인 시스템 cpu 리소스는 root_task_group의 태스크
+		 들과  자식 task-group들에 분배된다
 		 * In other words, if root_task_group has 10 tasks of weight
 		 * 1024) and two child groups A0 and A1 (of weight 1024 each),
 		 * then A0's share of the cpu resource is:
+		 즉, 만약 root_task_group이 가중치가 1024인 10개의 태스크와 두개의 자식그룹인
+		 A0과 A1를 가지고 있다면 A0의 cpu 리소스 쉐어는... 
 		 *
-		 *	A0's bandwidth = 1024 / (10*1024 + 1024 + 1024) = 8.33%
+		 *	A0's bandwidth = 1024 / (10*1024 + 1024 + 1024) = 8.33%ㅁ
+		 //분모 : 10개의 태스크 + A0 + A1 분자 : A0의 가중치
 		 *
 		 * We achieve this by letting root_task_group's tasks sit
 		 * directly in rq->cfs (i.e root_task_group->se[] = NULL).
+		 root_task_group의 태스크들을 rq->cfs에 직접 놓음으로서 위와 같은 과정을 
+		 거친다.
 		 */
 		init_cfs_bandwidth(&root_task_group.cfs_bandwidth);
 		init_tg_cfs_entry(&root_task_group, &rq->cfs, NULL, i, NULL);

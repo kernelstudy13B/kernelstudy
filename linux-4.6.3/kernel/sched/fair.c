@@ -8420,11 +8420,15 @@ void init_tg_cfs_entry(struct task_group *tg, struct cfs_rq *cfs_rq,
 			struct sched_entity *se, int cpu,
 			struct sched_entity *parent)
 {
+	//할당한 cfs_rq와 sched_entity를 태스크그룹과 연결함.
+	//sched_entity : task 뿐만 아니라 task group도 포함될수 있음.
 	struct rq *rq = cpu_rq(cpu);
 
 	cfs_rq->tg = tg;
 	cfs_rq->rq = rq;
-	init_cfs_rq_runtime(cfs_rq);
+	//상호 연결
+
+	init_cfs_rq_runtime(cfs_rq);//170204
 
 	tg->cfs_rq[cpu] = cfs_rq;
 	tg->se[cpu] = se;

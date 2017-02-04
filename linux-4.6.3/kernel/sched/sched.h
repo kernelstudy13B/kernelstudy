@@ -571,13 +571,18 @@ extern struct root_domain def_root_domain;
  * (such as the load balancing or the thread migration code), lock
  * acquire operations must be ordered by ascending &runqueue.
  */
+
+//main, per-CPU 런큐 데이터 구조체
 struct rq {
 	/* runqueue lock: */
 	raw_spinlock_t lock;
+	//
 
 	/*
 	 * nr_running and cpu_load should be in the same cacheline because
 	 * remote CPUs use both these fields when doing load calculation.
+	 nr_running과 cpu_load 배열은 같은 캐시라인에 있어야 한다
+	 remote CPU들이 load 계산시 두 필드를 다 사용하기 때문이다.
 	 */
 	unsigned int nr_running;
 #ifdef CONFIG_NUMA_BALANCING
