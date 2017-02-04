@@ -533,13 +533,14 @@ struct dl_rq {
  *
  */
 struct root_domain {
-	atomic_t refcount;
-	atomic_t rto_count;
-	struct rcu_head rcu;
-	cpumask_var_t span;
-	cpumask_var_t online;
+	atomic_t refcount; // reference count for the domain
+	atomic_t rto_count; // number of overloaded cpus
+	struct rcu_head rcu; 
+	cpumask_var_t span; // span of member cpus of the domain
+	cpumask_var_t online; // number of online cpus of the domain
 
 	/* Indicate more than one runnable task for any CPU */
+	// 동작 가능한 실시간 태스크가 이 도메인 내의 CPU 개수보다 많은가
 	bool overload;
 
 	/*

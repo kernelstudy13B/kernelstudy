@@ -7231,12 +7231,21 @@ DECLARE_PER_CPU(cpumask_var_t, load_balance_mask);
 // sched_entity 구조체 : CFS 스케줄러의 스케줄링 단위를 표현하는 구조체
 // runqueue 구조체 : CPU의 런큐
 // root_domain 구조체 : 실시간 프로세스를 스케줄링할 때 의사결정에 사용하는 구조체
+
+// task_struct 구조체 : policy, priority, rt_priority, time_slice 등의 필드 존재
+// policy 필드 : 어떤 스케줄링 정책을 사용하는가 SCHED_FIFO, SCHED_RR, SCHED_DEADLINE는 실시간 태스크를 위한 정책, SCHED_NORMAL, SCHED_IDLE, SCHED_BATCH는 일반 태스크를 위한 스케줄링 정책이다.
+// rt_priority : 실시간 스케줄링 정책을 사용하는 태스크는 이 필드를 이용해 우선순위를 설정하고 0~99를 가질수 있다. 태스크가 수행을 종료, 스스로 중지, 혹은 자신의 타임슬라이스를 다쓸 때까지(SCHED_RR만 해당), CPU를 사용한다. 실시간 정책은 우선순위가 변동되지 않는다. 우선순위가 높은 태스크가 낮은 태스크보다 먼저 실행될 것을 보장한다.`
+
+// SCHED_OTHERS 정책은 비 실시간 태스크들을 위한 정책이며 우선 순위가 높은 태스크가 먼저 수행되지만 수행되는 시간(time slice)은 주기적으로 재계산되며 우선순위는 동적으로 변경 된다.
+//
+
 void __init sched_init(void)
 {
 	int i, j;
 	unsigned long alloc_size = 0, ptr;
 
 #ifdef CONFIG_FAIR_GROUP_SCHED //normal process에 대한 그룹 스케줄링 활성화
+	// SCHED_NORAML, SCHED_BATCH 정책 중 하나를 선택해야한다.
 	alloc_size += 2 * nr_cpu_ids * sizeof(void **);
 #endif
 #ifdef CONFIG_RT_GROUP_SCHED //real time process에 대한 그룹 스케줄링 활성화
@@ -7262,34 +7271,58 @@ void __init sched_init(void)
 
 #endif /* CONFIG_RT_GROUP_SCHED */
 	}
-#ifdef CONFIG_CPUMASK_OFFSTACK
-	for_each_possible_cpu(i) {
+#ifdef CONFIG_CPUMASK_OFFSTACK 
+	// stack을 안쓰고 비용이 조금 더 들더라도  cpumask_var_t 자료형 변수를 동작할당 하겠다.(stack overflow를 피하기 위해서)
+	for_each_possible_cpu(i) { 
+		// load_balance_mask(이 CPU는 로드 밸런스 해야된다. 는 뜻을 나타내는것 같음... 추측...)
+		//  CPU별로 load_balance_mask 변수를 할당
 		per_cpu(load_balance_mask, i) = (cpumask_var_t)kzalloc_node(
 			cpumask_size(), GFP_KERNEL, cpu_to_node(i));
 	}
 #endif /* CONFIG_CPUMASK_OFFSTACK */
 
+	// ex) 30 프레임을 디코딩해서 화면에 출력해야하는 태스크의 경우
+	// period : 초당 30회라는 "주기성'을 나타냄
+	// runtime : 1초/30 보다 적은 시간내에 수행되어야할 "작업량"
+	//
+	// 여기서는 global_rt_xxx()... 디폴트 값?
+	// struct rt_bandwidth는 period, runtime, timer를 갖고있어서 실시간 스케줄링할 때 사용하는 구조체인 듯 함.(모기향 책에서는 실시간 태스크 그룹의 사용 가능한 CPU 사용량을 기술하는 구조체라고 설명됨)
+	// sched_setscheduler() 함수로 스케줄링 정책 설정이 가능한데, rt_bandwidth 자료구조는 SCHED_RR, SCHED_FIFO일 때 쓰는것 같고 dl_bandwidth 자료구조는 SCHED_DEADLINE 일 때 쓰는 것 같음. 그래서 여기서 둘다 초기화 하는 듯함
 	init_rt_bandwidth(&def_rt_bandwidth,
 			global_rt_period(), global_rt_runtime());
 	init_dl_bandwidth(&def_dl_bandwidth,
 			global_rt_period(), global_rt_runtime());
 
 #ifdef CONFIG_SMP
+	// root_domain은 배타직인 cpuset을 구성해서 만들 수 있다. cpuset은 프로세스 그룹에 의해 사용되는 cpu를 다른 cpuset에서는 사용되지 않도록 격리할 수 있다.
 	init_defrootdomain();
 #endif
 
-#ifdef CONFIG_RT_GROUP_SCHED
+// 그룹화하는 방법으로 cgroup을 사용 : CONFIG_RT_GROUP_SCHED
+// 그룹화하는 방법으로 process의 uid를 사용 : CONFIG_USER_SCHED
+// ex) 철수가 99개 프로세스 영희가 1개 프로세스 철수가 99만큼 쓰고 영희가 1개만 쓰면 불공평
+#ifdef CONFIG_RT_GROUP_SCHED 
+	// 위에서는 프로세스를 그룹화해서 관리하지 않는 경우에 대해서 rt_bandwidth를 초기화했고, 실시간 프로세스를 그룹화해서 관리하는 경우 여기에서 또 초기화
 	init_rt_bandwidth(&root_task_group.rt_bandwidth,
 			global_rt_period(), global_rt_runtime());
 #endif /* CONFIG_RT_GROUP_SCHED */
 
 #ifdef CONFIG_CGROUP_SCHED
+	// 프로세스들을 그룹화 하는데 CGROUP을 이용하면 task_group을 위한 slub, slab 할당자를 만든다.(캐시를 만든다.)
 	task_group_cache = KMEM_CACHE(task_group, 0);
 
+	// task_groups가 리스트의 헤드고 root_task_group을 리스트에 추가
 	list_add(&root_task_group.list, &task_groups);
+
+	// root_task_group의 children과 siblings를 헤드로 리스트 생성
 	INIT_LIST_HEAD(&root_task_group.children);
 	INIT_LIST_HEAD(&root_task_group.siblings);
-	autogroup_init(&init_task);
+	autogroup_init(&init_task); // task_struct 자료형
+	// autogroup : task의 task_group을 자동으로 정해주는 기능
+	// 예를들어) 
+	// 1. 새로운 세션을 열어 로그인하는 경우 새로운 task_group을 만든다.
+	// 2. 새로운 태스크가 생성될 때 default(root_task_group)에 태스크를 할당한다.
+	// 이런 기능을 하는 autogroup 기능을 사용하기 위한 초기화
 #endif /* CONFIG_CGROUP_SCHED */
 
 	for_each_possible_cpu(i) {

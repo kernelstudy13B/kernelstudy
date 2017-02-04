@@ -40,14 +40,14 @@ static enum hrtimer_restart sched_rt_period_timer(struct hrtimer *timer)
 
 void init_rt_bandwidth(struct rt_bandwidth *rt_b, u64 period, u64 runtime)
 {
-	rt_b->rt_period = ns_to_ktime(period);
+	rt_b->rt_period = ns_to_ktime(period); // 나노 세컨드를 -> ktime 구조체로 변환
 	rt_b->rt_runtime = runtime;
 
 	raw_spin_lock_init(&rt_b->rt_runtime_lock);
 
 	hrtimer_init(&rt_b->rt_period_timer,
-			CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	rt_b->rt_period_timer.function = sched_rt_period_timer;
+			CLOCK_MONOTONIC, HRTIMER_MODE_REL); // timer를 생성
+	rt_b->rt_period_timer.function = sched_rt_period_timer; // timer 재시작을 위한 콜백 등록
 }
 
 static void start_rt_bandwidth(struct rt_bandwidth *rt_b)
