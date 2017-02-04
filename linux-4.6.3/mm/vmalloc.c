@@ -321,6 +321,7 @@ static void __insert_vmap_area(struct vmap_area *va)
 
 		parent = *p;
 		tmp_va = rb_entry(parent, struct vmap_area, rb_node);
+		//레드블랙트리
 		if (va->va_start < tmp_va->va_end)
 			p = &(*p)->rb_left;
 		else if (va->va_end > tmp_va->va_start)
@@ -1199,18 +1200,19 @@ void __init vm_area_register_early(struct vm_struct *vm, size_t align)
 
 void __init vmalloc_init(void)
 {
-	struct vmap_area *va;
-	struct vm_struct *tmp;
+	struct vmap_area *va;//
+	struct vm_struct *tmp;//
 	int i;
 
 	for_each_possible_cpu(i) {
 		struct vmap_block_queue *vbq;
 		struct vfree_deferred *p;
+		//이 두 구조체를 초기화하는 함수.
 
-		vbq = &per_cpu(vmap_block_queue, i);
+		vbq = &per_cpu(vmap_block_queue, i);//i번째 cpu의 vmap_block_queue를 로드하는 데이터의 주소
 		spin_lock_init(&vbq->lock);
 		INIT_LIST_HEAD(&vbq->free);
-		p = &per_cpu(vfree_deferred, i);
+		p = &per_cpu(vfree_deferred, i);//i번째 cpu의 vfree_deferred를 로드하는 데이터의 주소
 		init_llist_head(&p->list);
 		INIT_WORK(&p->wq, free_work);
 	}
@@ -1223,6 +1225,8 @@ void __init vmalloc_init(void)
 		va->va_end = va->va_start + tmp->size;
 		va->vm = tmp;
 		__insert_vmap_area(va);
+		//vmap_area는 vmlist와 레드블랙트리로 관리
+		//전역 vmlist에 등록되어있는 수 만큼 vmap_area 구조체를 할당 받아 초기화하여 vmap_area에 추가
 	}
 
 	vmap_area_pcpu_hole = VMALLOC_END;

@@ -27,11 +27,13 @@ early_param("nohugeiomap", set_nohugeiomap);
 
 void __init ioremap_huge_init(void)
 {
-	if (!ioremap_huge_disabled) {
+	//ioremap : 물리 메모리 주소를 가상 메모리 주소로 바꿔주는 함수.
+	if (!ioremap_huge_disabled) {//disabled 관련 함수를 거치지 않았을 경우
 		if (arch_ioremap_pud_supported())
 			ioremap_pud_capable = 1;
 		if (arch_ioremap_pmd_supported())
 			ioremap_pmd_capable = 1;
+		//현 아키텍처에서 물리 메모리를 가상메모리 주소로 변환할때 관련된 페이지 테이블 단계에 대한 초기화, pgd는 무조건 capable 가능한것으로 추측.
 	}
 }
 

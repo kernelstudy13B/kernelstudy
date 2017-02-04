@@ -38,7 +38,7 @@ struct vm_struct {
 	const void		*caller;
 };
 
-struct vmap_area {
+struct vmap_area {			//특정 가상메모리 공간에 대한 필드공간
 	unsigned long va_start;
 	unsigned long va_end;
 	unsigned long flags;

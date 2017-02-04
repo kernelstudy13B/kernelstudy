@@ -4004,6 +4004,7 @@ __kmem_cache_alias(const char *name, size_t size, size_t align,
 	struct kmem_cache *s, *c;
 
 	s = find_mergeable(size, align, flags, name, ctor);
+	//인자에 따라 병합 가능한 캐시를 찾음
 	if (s) {
 		s->refcount++;
 
