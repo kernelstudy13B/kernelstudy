@@ -7226,6 +7226,11 @@ static struct kmem_cache *task_group_cache __read_mostly;
 
 DECLARE_PER_CPU(cpumask_var_t, load_balance_mask);
 
+// task_group 구조체 : 그룹 스케줄링에 사용하는 구조체
+// rt_bandwidth 구조체 : 실시간 프로세스에게 CPU 자원을 분배하기 위한 구조체
+// sched_entity 구조체 : CFS 스케줄러의 스케줄링 단위를 표현하는 구조체
+// runqueue 구조체 : CPU의 런큐
+// root_domain 구조체 : 실시간 프로세스를 스케줄링할 때 의사결정에 사용하는 구조체
 void __init sched_init(void)
 {
 	int i, j;
