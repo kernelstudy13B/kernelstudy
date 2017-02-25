@@ -169,25 +169,31 @@ void init_tg_rt_entry(struct task_group *tg, struct rt_rq *rt_rq,
 {
 	struct rq *rq = cpu_rq(cpu);
 
-	rt_rq->highest_prio.curr = MAX_RT_PRIO;
+	rt_rq->highest_prio.curr = MAX_RT_PRIO;//가장 우선권이 높을 curr(현재는 첫번째?)에 지정된 우선권값(MAX...)를 넣는다
 	rt_rq->rt_nr_boosted = 0;
+	//우선권 boosted : boosted되면 먼저 처리가 될 것, 지금은 초기화과정으로 대상이 없으므로 0으로 초기화
 	rt_rq->rq = rq;
 	rt_rq->tg = tg;
 
 	tg->rt_rq[cpu] = rt_rq;
 	tg->rt_se[cpu] = rt_se;
 
-	if (!rt_se)
+	if (!rt_se)//초기화 과정에는 sched_entity가 존재하지 않으므로 리턴됨
 		return;
 
-	if (!parent)
+	//cpu의 런큐는 기본적으로 하나지만 entity가 task group의 형태가 될수 있으므로 그 task들을 가지고 있는 런큐가 또 필요로 하게 됨.따라서 무조건 cpu가 런큐가 하나인 법은 없다....
+
+	if (!parent)//자식
 		rt_se->rt_rq = &rq->rt;
-	else
+	//reatime 런큐안에 속한 sched_entity가 자신이 속한 realtime의 런큐를 가르키게 함
+	else//부모
 		rt_se->rt_rq = parent->my_q;
+	//realtime 런큐안에 속한 sched_entity가 부모의 런큐를 가르키게 한다
 
 	rt_se->my_q = rt_rq;
 	rt_se->parent = parent;
 	INIT_LIST_HEAD(&rt_se->run_list);
+	//이 과정은 스케줄링이 실제로 이루어질때의 과정, 부팅 시퀀스에서는 이전에 리턴이 되므로 실행이 안됨(태스크라는 개념이 없는 부팅 시퀀스)
 }
 
 int alloc_rt_sched_group(struct task_group *tg, struct task_group *parent)

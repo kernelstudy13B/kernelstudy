@@ -296,9 +296,12 @@ static inline void init_hrtick(void)
 
 static void init_rq_hrtick(struct rq *rq)
 {
+	//hrtick : high resolution tick
+	//hz에 대한 대안으로 (hz는 너무 coarse) 쓰는 타이머
+	//1/hz보다 더 정확함
 #ifdef CONFIG_SMP
 	rq->hrtick_csd_pending = 0;
-
+	//csd : call single data
 	rq->hrtick_csd.flags = 0;
 	rq->hrtick_csd.func = __hrtick_start;
 	rq->hrtick_csd.info = rq;
@@ -693,7 +696,7 @@ static void set_load_weight(struct task_struct *p)
 {
 	int prio = p->static_prio - MAX_RT_PRIO;
 	struct load_weight *load = &p->se.load;
-
+	
 	/*
 	 * SCHED_IDLE tasks get minimal weight:
 	 */
@@ -701,10 +704,13 @@ static void set_load_weight(struct task_struct *p)
 		load->weight = scale_load(WEIGHT_IDLEPRIO);
 		load->inv_weight = WMULT_IDLEPRIO;
 		return;
+		//policy가 idle로 설정
 	}
 
 	load->weight = scale_load(sched_prio_to_weight[prio]);
+	//가지고 있느 priority를 weight로 전환(초기화의 일환)
 	load->inv_weight = sched_prio_to_wmult[prio];
+	//init_task의 priority에 따라 할당이 되는 값으로 초기화(constant 배열에 있는 값들이 지정되어있다
 }
 
 static inline void enqueue_task(struct rq *rq, struct task_struct *p, int flags)
@@ -2054,6 +2060,7 @@ int wake_up_state(struct task_struct *p, unsigned int state)
 /*
  * This function clears the sched_dl_entity static params.
  */
+//sched_dl_entity(데드라인 스케줄러의 엔티티들)의 static 패러미터들을 모두 클리어
 void __dl_clear_params(struct task_struct *p)
 {
 	struct sched_dl_entity *dl_se = &p->dl;
@@ -2071,7 +2078,7 @@ void __dl_clear_params(struct task_struct *p)
 /*
  * Perform scheduler related setup for a newly forked process p.
  * p is forked by current.
- *
+ * 새롭게 forked(생성이 된) 프로세스 p(현 시점-170225-에서는 idle 프로세스)위한 스케줄러 관련 셋업을 실행한다
  * __sched_fork() is basic setup used by init_idle() too:
  */
 static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
@@ -2085,21 +2092,26 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 	p->se.nr_migrations		= 0;
 	p->se.vruntime			= 0;
 	INIT_LIST_HEAD(&p->se.group_node);
+	//필드 초기화가 끝난 후 리스트 초기화
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	p->se.cfs_rq			= NULL;
+	//idle 프로세스는 실제로 cfs를 사용하지 않는다
 #endif
 
 #ifdef CONFIG_SCHEDSTATS
+	//SCHEDSTATS : 스케줄링의 현재 status를 표기
 	/* Even if schedstat is disabled, there should not be garbage */
 	memset(&p->se.statistics, 0, sizeof(p->se.statistics));
+	//idle 프로세스의 sched entity의 통계(statistics...)에 대한 초기화
 #endif
 
 	RB_CLEAR_NODE(&p->dl.rb_node);
-	init_dl_task_timer(&p->dl);
-	__dl_clear_params(p);
+	//데드라인 스케줄러에서는 레드블랙트리를 사용, 이를 위해 레드블랙 트리의 노드들을 초기화
+	init_dl_task_timer(&p->dl);//high resolution 타이머를 이용한 타이머 초기화
+	__dl_clear_params(p);//sched entity의 패러미터들을 전부 0으로 초기화
 
-	INIT_LIST_HEAD(&p->rt.run_list);
+	INIT_LIST_HEAD(&p->rt.run_list);//realtime 스케줄러 초기화를 위한 과정
 	p->rt.timeout		= 0;
 	p->rt.time_slice	= sched_rr_timeslice;
 	p->rt.on_rq		= 0;
@@ -2107,16 +2119,26 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 
 #ifdef CONFIG_PREEMPT_NOTIFIERS
 	INIT_HLIST_HEAD(&p->preempt_notifiers);
+	//preemtion, nonpreemtion에 따라 응답시간이 달라질수 있다
+	//notifier : preemtion의 여부에 대한 지시자
 #endif
 
 #ifdef CONFIG_NUMA_BALANCING
-	if (p->mm && atomic_read(&p->mm->mm_users) == 1) {
+	if (p->mm && atomic_read(&p->mm->mm_users) == 1) 
+	//mm_struct가 존재하고 mm_users가 1일떄
+	{
 		p->mm->numa_next_scan = jiffies + msecs_to_jiffies(sysctl_numa_balancing_scan_delay);
+		//...?
+		//스캔 : 프로세스에서 메모리가 할당이 되거나 할때 메모리를 가져오기 위해 주소를 스캔한다???
+		//NUMA는 불균형하게 메모리를 접근하므로 먼 곳에 있는 메모리를 가까이 가져오기 위해 스캔
 		p->mm->numa_scan_seq = 0;
+		//스캔을 할 순서를 지칭??.. 그러나 초기화이므로 값은 0이 들어감
 	}
 
 	if (clone_flags & CLONE_VM)
 		p->numa_preferred_nid = current->numa_preferred_nid;
+	//nid : numa node(메모리뱅크) id
+	//스레드 생성시 부모와 자식 스레드(clone을 통해 생성되고 flags를 비교)는 메모리 공간을 공유하고 그 공간이 더 선호되는 노드를 가리키게 한다
 	else
 		p->numa_preferred_nid = -1;
 
@@ -5025,8 +5047,10 @@ void init_idle_bootup_task(struct task_struct *idle)
  * NOTE: this function does not set the idle thread's NEED_RESCHED
  * flag, to make booting more robust.
  */
+//주어진 cpu를 위해 idle 스레드를 세팅
 void init_idle(struct task_struct *idle, int cpu)
 {
+	//task_struct : 태스크 컨트로 블락
 	struct rq *rq = cpu_rq(cpu);
 	unsigned long flags;
 
@@ -5035,10 +5059,11 @@ void init_idle(struct task_struct *idle, int cpu)
 
 	__sched_fork(0, idle);
 	idle->state = TASK_RUNNING;
-	idle->se.exec_start = sched_clock();
-
+	idle->se.exec_start = sched_clock();//이 함수가 실행되는 시간을 캡쳐하여 sched entity의 exec_start 필드에 저장
+	
+	//170225
 	kasan_unpoison_task_stack(idle);
-
+	//kasan : kernel addfress sanitizer
 #ifdef CONFIG_SMP
 	/*
 	 * Its possible that init_idle() gets called multiple times on a task,
@@ -5365,6 +5390,7 @@ static void set_rq_online(struct rq *rq)
 
 static void set_rq_offline(struct rq *rq)
 {
+	//online 비트를 전부 offline으로 바꿈
 	if (rq->online) {
 		const struct sched_class *class;
 
@@ -5687,7 +5713,7 @@ static void free_rootdomain(struct rcu_head *rcu)
 	free_cpumask_var(rd->online);
 	free_cpumask_var(rd->span);
 	kfree(rd);
-}
+	}
 
 static void rq_attach_root(struct rq *rq, struct root_domain *rd)
 {
@@ -5699,6 +5725,7 @@ static void rq_attach_root(struct rq *rq, struct root_domain *rd)
 	if (rq->rd) {
 		old_rd = rq->rd;
 
+		//런큐의 cpu의 정보를 불러오기 위한 함수
 		if (cpumask_test_cpu(rq->cpu, old_rd->online))
 			set_rq_offline(rq);
 
@@ -5709,21 +5736,26 @@ static void rq_attach_root(struct rq *rq, struct root_domain *rd)
 		 * set old_rd to NULL to skip the freeing later
 		 * in this function:
 		 */
+		//old_rd(인자의 rd)를 프리시키지 않을거면 old_rd를 NULL로 만듬
 		if (!atomic_dec_and_test(&old_rd->refcount))
 			old_rd = NULL;
 	}
 
-	atomic_inc(&rd->refcount);
-	rq->rd = rd;
+	atomic_inc(&rd->refcount);//reference count ++
+	rq->rd = rd;//모든 과정이 끝나면 새로운 rd가 런큐 필드에 들어옴
 
-	cpumask_set_cpu(rq->cpu, rd->span);
+	cpumask_set_cpu(rq->cpu, rd->span);//cpu 정보를 다시 기입
 	if (cpumask_test_cpu(rq->cpu, cpu_active_mask))
 		set_rq_online(rq);
+	//active 상태의 cpu면 rq의 cpu를 online으로 지정
 
 	raw_spin_unlock_irqrestore(&rq->lock, flags);
 
 	if (old_rd)
 		call_rcu_sched(&old_rd->rcu, free_rootdomain);
+	/*RCU : 읽기 동작에서 블러킹 되지 않는 r/w 동기화 메커니즘
+		read-side overhead를 최소화하는 목적
+		본 라인은 old_rd(원래 rootdomain)을 해제*/
 }
 
 static int init_rootdomain(struct root_domain *rd)
@@ -5763,6 +5795,7 @@ out:
  * By default the system creates a single root-domain with all cpus as
  * members (mimicking the global state we have today).
  */
+//기본적으로 시스템은 멤버로서의 모든 cpu와 함께 싱글 root-domain을 만든다
 struct root_domain def_root_domain;
 
 static void init_defrootdomain(void)
@@ -7381,14 +7414,16 @@ void __init sched_init(void)
 #endif /* CONFIG_FAIR_GROUP_SCHED */
 
 		rq->rt.rt_runtime = def_rt_bandwidth.rt_runtime;
+		//리얼타임 스케줄러를 위한 런 큐의 런타임 초기화
 #ifdef CONFIG_RT_GROUP_SCHED
 		init_tg_rt_entry(&root_task_group, &rq->rt, NULL, i, NULL);
+		//현재는 부팅 시퀀스이므로 root task group이 없고 주소값으로 스케줄러에 대한 전처리를 해주는 과정, 이는 앞의 init_tg_cfs_entry
 #endif
 
 		for (j = 0; j < CPU_LOAD_IDX_MAX; j++)
 			rq->cpu_load[j] = 0;
 
-		rq->last_load_update_tick = jiffies;
+		rq->last_load_update_tick = jiffies;//시점에 대한 값을 넣어줌
 
 #ifdef CONFIG_SMP
 		rq->sd = NULL;
@@ -7397,6 +7432,7 @@ void __init sched_init(void)
 		rq->balance_callback = NULL;
 		rq->active_balance = 0;
 		rq->next_balance = jiffies;
+		//태스크의 wait sum이 길어지지 않도록 고르게 분배하도록 함
 		rq->push_cpu = 0;
 		rq->cpu = i;
 		rq->online = 0;
@@ -7409,16 +7445,20 @@ void __init sched_init(void)
 		rq_attach_root(rq, &def_root_domain);
 #ifdef CONFIG_NO_HZ_COMMON
 		rq->nohz_flags = 0;
+		//hz : 커널에서 주기적으로 발생하는 시스템 타이머 인터럽트 회수
+		//nohz : cpu가 idle 상태일때는 절전모드와 같은 상태로 지속되는데 이때 인터럽트를 더 줄일수 있도록 함.(hz를 억제)
 #endif
 #ifdef CONFIG_NO_HZ_FULL
 		rq->last_sched_tick = 0;
+		
 #endif
 #endif
 		init_rq_hrtick(rq);
-		atomic_set(&rq->nr_iowait, 0);
+		atomic_set(&rq->nr_iowait, 0);//초기화 일환으로 iowait 필드를 0으로 초기화
 	}
 
 	set_load_weight(&init_task);
+	//전 과정이 부팅시퀀스에서의 초기화 과정이었다면 지금단계에선 init_task에 대한 처리를 하기 시작
 
 #ifdef CONFIG_PREEMPT_NOTIFIERS
 	INIT_HLIST_HEAD(&init_task.preempt_notifiers);
@@ -7427,12 +7467,17 @@ void __init sched_init(void)
 	/*
 	 * The boot idle thread does lazy MMU switching as well:
 	 */
-	atomic_inc(&init_mm.mm_count);
+	//boot idle 쓰레드는 lazy MMU 스위칭을 한다
+	//메모리에 대한 작업 자체가 아닌 MMU가 관리할 태스크에 대한 스케줄링 관리를 위한 초기화 시도
+	atomic_inc(&init_mm.mm_count);//init_mm에 접근횟수 한번 증가
 	enter_lazy_tlb(&init_mm, current);
-
+	//tlb : translation lookaside buffer
+	//tlb : 가상 주소에서 물리 주소로 전환할떄 작업을 원활하고 빠르게 하기위한 일종의 캐시
+	//current : 현재 수행되고 있는 태스크 컨트롤 블락
 	/*
 	 * During early bootup we pretend to be a normal task:
 	 */
+	//early bootup 동안 normal task(정확하게는 cfs)정책을 받도록 하겠다.
 	current->sched_class = &fair_sched_class;
 
 	/*
@@ -7441,7 +7486,9 @@ void __init sched_init(void)
 	 * but because we are the idle thread, we just pick up running again
 	 * when this runqueue becomes "idle".
 	 */
+	//idle 스레드를 만드는 과정. 기술적으로 schedule()(scheduling을 행하는 함수)는 idle 스레드로부터 호출이 되지 않지만 어쩄든 idle 스레드이므로 런큐가 idle 상태가 됐을떄 다시 running을 하게 한다.
 	init_idle(current, smp_processor_id());
+	//init task(실제 데몬을 실행하는 태스크)와 idle process(부팅 시퀀스에서의 초기화가 끝나면 만들어지는 0번 프로세스)를 별개로 생각해야함
 
 	calc_load_update = jiffies + LOAD_FREQ;
 

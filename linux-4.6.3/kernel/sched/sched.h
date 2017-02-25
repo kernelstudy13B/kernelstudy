@@ -424,10 +424,11 @@ struct cfs_rq {
 	struct task_group *tg;	/* group that "owns" this runqueue */
 
 #ifdef CONFIG_CFS_BANDWIDTH
-	int runtime_enabled;
-	u64 runtime_expires;
-	s64 runtime_remaining;
+	int runtime_enabled;//?
+	u64 runtime_expires;//cfs bandwidth를 능가하는 것에 대한 변수
+	s64 runtime_remaining;//cfs bandwidth 보다 작게 실행되는 것에 대한 변수
 
+	//throttle : expire는 bandwidth를 넘었기 떄문에 처리가 안되니까 throttle list로 이동
 	u64 throttled_clock, throttled_clock_task;
 	u64 throttled_clock_task_time;
 	int throttled, throttle_count;
@@ -605,7 +606,7 @@ struct rq {
 	u64 nr_switches;
 
 	struct cfs_rq cfs;
-	struct rt_rq rt;
+	struct rt_rq rt; //real time
 	struct dl_rq dl;
 
 #ifdef CONFIG_FAIR_GROUP_SCHED

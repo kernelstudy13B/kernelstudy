@@ -4157,8 +4157,9 @@ void init_cfs_bandwidth(struct cfs_bandwidth *cfs_b)
 
 static void init_cfs_rq_runtime(struct cfs_rq *cfs_rq)
 {
-	cfs_rq->runtime_enabled = 0;
+	cfs_rq->runtime_enabled = 0;//init이므로 disabled??
 	INIT_LIST_HEAD(&cfs_rq->throttled_list);
+	//throttled_list : 태스크가 들어온 것이 없으므로 초기화 외에는 무의미한 값
 }
 
 void start_cfs_bandwidth(struct cfs_bandwidth *cfs_b)
@@ -8420,18 +8421,19 @@ void init_tg_cfs_entry(struct task_group *tg, struct cfs_rq *cfs_rq,
 			struct sched_entity *se, int cpu,
 			struct sched_entity *parent)
 {
+	//rq : run queue
 	//할당한 cfs_rq와 sched_entity를 태스크그룹과 연결함.
 	//sched_entity : task 뿐만 아니라 task group도 포함될수 있음.
 	struct rq *rq = cpu_rq(cpu);
 
-	cfs_rq->tg = tg;
+	cfs_rq->tg = tg;//root task group
 	cfs_rq->rq = rq;
 	//상호 연결
 
 	init_cfs_rq_runtime(cfs_rq);//170204
 
 	tg->cfs_rq[cpu] = cfs_rq;
-	tg->se[cpu] = se;
+	tg->se[cpu] = se;//이떄 se는 null
 
 	/* se could be NULL for root_task_group */
 	if (!se)
