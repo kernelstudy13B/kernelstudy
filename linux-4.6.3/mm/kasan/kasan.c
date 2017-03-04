@@ -42,14 +42,18 @@
  * Poisons the shadow memory for 'size' bytes starting from 'addr'.
  * Memory addresses should be aligned to KASAN_SHADOW_SCALE_SIZE.
  */
+//addr에서 시작하는 size 바이트들을 위해 쉐도우메모리를 poison한다
 static void kasan_poison_shadow(const void *address, size_t size, u8 value)
 {
+	//함수의 명칭은 poison 이지만 결국 value가 0이므로 unpoison
 	void *shadow_start, *shadow_end;
 
 	shadow_start = kasan_mem_to_shadow(address);
 	shadow_end = kasan_mem_to_shadow(address + size);
+	//주소마다 쉐도우 매핑.
 
 	memset(shadow_start, value, shadow_end - shadow_start);
+	//0으로 poison??????(결국은 unpoison)
 }
 
 void kasan_unpoison_shadow(const void *address, size_t size)
@@ -58,21 +62,32 @@ void kasan_unpoison_shadow(const void *address, size_t size)
 
 	if (size & KASAN_SHADOW_MASK) {
 		u8 *shadow = (u8 *)kasan_mem_to_shadow(address + size);
-		*shadow = size & KASAN_SHADOW_MASK;
+		//쉐도우 값을 넣을 주소를 먼저 찾음
+		//유효성 검사를 하고 싶은 주소공간을 담음
+		*shadow = size & KASAN_SHADOW_MASK;//이 마스크는 7
+		//8바이트내에서 어떤 값이 유효한지를 파악... 찾은 주소에 비트마스킹 값을 삽입
+		//마지막에 align되지 않는 비트에 대한처리
 	}
 }
 
 static void __kasan_unpoison_stack(struct task_struct *task, void *sp)
 {
 	void *base = task_stack_page(task);
-	size_t size = sp - base;
+	size_t size = sp - base;//THREAD_SIZE가 됨??
 
 	kasan_unpoison_shadow(base, size);
+	//stack_canary는 런타임에서, 그러나 kasan은 컴파일단계에서 
+	//poison : 검사를 위한 어떤 값을 넣는다?, 
+	//unposion : 검사를 위한 어떤 값을 뺴는거?, 0으로 바꿈 즉 legal access로 바꿔줌
+	//shadow : 일종의 테이블, 0이면 8바이트가 전부 엑세스가 가능, 1~7이면 엑세스 가능한 주소값의 갯수가 들어감
 }
 
 /* Unpoison the entire stack for a task. */
 void kasan_unpoison_task_stack(struct task_struct *task)
 {
+	//kasan : 동적 메모리 에러 감지.
+	//init_idle과 직접적인 연관이 있는건지??
+	//메모리 접근 체크를 위한 컴파일 타임 작동에 사용
 	__kasan_unpoison_stack(task, task_stack_page(task) + THREAD_SIZE);
 }
 

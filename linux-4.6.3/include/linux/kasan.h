@@ -27,6 +27,8 @@ static inline void *kasan_mem_to_shadow(const void *addr)
 {
 	return (void *)((unsigned long)addr >> KASAN_SHADOW_SCALE_SHIFT)
 		+ KASAN_SHADOW_OFFSET;
+	//offset는 아키텍처 마다 다름.
+	//addr은 체크하고싶은 주소, 그 주소를 오른쪽으로 3비트시프트하면 
 }
 
 /* Enable reporting bugs after kasan_disable_current() */

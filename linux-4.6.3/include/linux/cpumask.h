@@ -480,6 +480,7 @@ static inline bool cpumask_full(const struct cpumask *srcp)
  */
 static inline unsigned int cpumask_weight(const struct cpumask *srcp)
 {
+	//cpumask_of의 리턴값에 속해있는 비트의 갯수를 구함
 	return bitmap_weight(cpumask_bits(srcp), nr_cpumask_bits);
 }
 

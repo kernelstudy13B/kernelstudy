@@ -959,8 +959,10 @@ static inline struct task_group *task_group(struct task_struct *p)
 }
 
 /* Change a task's cfs_rq and parent entity if it moves across CPUs/groups */
+//CPU들과 그룹에 걸쳐 이동할시 태스크의 부모엔티티와 cfs런큐를 바꿔준다
 static inline void set_task_rq(struct task_struct *p, unsigned int cpu)
 {
+	//cfs의 런큐도 RB트리
 #if defined(CONFIG_FAIR_GROUP_SCHED) || defined(CONFIG_RT_GROUP_SCHED)
 	struct task_group *tg = task_group(p);
 #endif

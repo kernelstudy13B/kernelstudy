@@ -1047,7 +1047,10 @@ static int migration_cpu_stop(void *data)
 void set_cpus_allowed_common(struct task_struct *p, const struct cpumask *new_mask)
 {
 	cpumask_copy(&p->cpus_allowed, new_mask);
+	//cpu_allowed : 프로세스는 원래 구동되었던 cpu에서 구동되어야 하는데 그 구동되는 cpu를 지정하는 필드(어떤 cpu에 친화력이 있는가에 대한 마스킹)
+	//new_mask는 cpumask_of(cpu)의 리턴값이고 이 마스크값이 아이들 테스크 스트럭처에 cpus_allowed 필드 포인터에 저장된다
 	p->nr_cpus_allowed = cpumask_weight(new_mask);
+	//소스(new_mask)의 비트를 세는 함수를 통해 cpus_allowed 마스킹의 갯수를 지정
 }
 
 void do_set_cpus_allowed(struct task_struct *p, const struct cpumask *new_mask)
@@ -5063,7 +5066,7 @@ void init_idle(struct task_struct *idle, int cpu)
 	
 	//170225
 	kasan_unpoison_task_stack(idle);
-	//kasan : kernel addfress sanitizer
+	//kasan : kernel address sanitizer
 #ifdef CONFIG_SMP
 	/*
 	 * Its possible that init_idle() gets called multiple times on a task,
@@ -5071,6 +5074,7 @@ void init_idle(struct task_struct *idle, int cpu)
 	 *
 	 * And since this is boot we can forgo the serialization.
 	 */
+	//affirnity에 대한 설정
 	set_cpus_allowed_common(idle, cpumask_of(cpu));
 #endif
 	/*
@@ -5081,6 +5085,8 @@ void init_idle(struct task_struct *idle, int cpu)
 	 * Similar case to sched_fork(). / Alternatively we could
 	 * use task_rq_lock() here and obtain the other rq->lock.
 	 *
+	 rq->lock이 홀딩되어 있지만 cpu는 아직 세팅이 되어있지 않으므로
+	 task_group()안 lockdep check는 실패
 	 * Silence PROVE_RCU
 	 */
 	rcu_read_lock();
