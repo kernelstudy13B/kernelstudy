@@ -231,7 +231,7 @@ static inline void raw_write_seqcount_begin(seqcount_t *s)
 static inline void raw_write_seqcount_end(seqcount_t *s)
 {
 	smp_wmb();
-	s->sequence++;
+	s->sequence++;//lock 사용과는 무관하게 증가함
 }
 
 /**

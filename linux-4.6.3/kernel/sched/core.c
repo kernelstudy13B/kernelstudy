@@ -5094,18 +5094,21 @@ void init_idle(struct task_struct *idle, int cpu)
 	rcu_read_unlock();
 
 	rq->curr = rq->idle = idle;
-	idle->on_rq = TASK_ON_RQ_QUEUED;
+	idle->on_rq = TASK_ON_RQ_QUEUED;//RQ의 QUEUE에 넣어지는 태스크
 #ifdef CONFIG_SMP
-	idle->on_cpu = 1;
+	idle->on_cpu = 1;//
 #endif
 	raw_spin_unlock(&rq->lock);
 	raw_spin_unlock_irqrestore(&idle->pi_lock, flags);
 
 	/* Set the preempt count _outside_ the spinlocks! */
 	init_idle_preempt_count(idle, cpu);
+	//idle 프로세스가 선점이 가능하도록 초기화
 
 	/*
 	 * The idle tasks have their own, simple scheduling class:
+	 idle 태스크들은 그 태스크만의 스케줄링 클래스를 가진다
+	 (인터페이스와 비슷?)
 	 */
 	idle->sched_class = &idle_sched_class;
 	ftrace_graph_init_idle_task(idle, cpu);
@@ -7497,6 +7500,8 @@ void __init sched_init(void)
 	//init task(실제 데몬을 실행하는 태스크)와 idle process(부팅 시퀀스에서의 초기화가 끝나면 만들어지는 0번 프로세스)를 별개로 생각해야함
 
 	calc_load_update = jiffies + LOAD_FREQ;
+	//지금까지 진행되면서 처리된 jiffie값과 LOAD_FREQ(간격)을 더해서
+	//계산한 값 저장
 
 #ifdef CONFIG_SMP
 	zalloc_cpumask_var(&sched_domains_tmpmask, GFP_NOWAIT);

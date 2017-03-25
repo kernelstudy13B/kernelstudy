@@ -960,6 +960,7 @@ static inline struct task_group *task_group(struct task_struct *p)
 
 /* Change a task's cfs_rq and parent entity if it moves across CPUs/groups */
 //CPU들과 그룹에 걸쳐 이동할시 태스크의 부모엔티티와 cfs런큐를 바꿔준다
+
 static inline void set_task_rq(struct task_struct *p, unsigned int cpu)
 {
 	//cfs의 런큐도 RB트리
@@ -969,11 +970,16 @@ static inline void set_task_rq(struct task_struct *p, unsigned int cpu)
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	set_task_rq_fair(&p->se, p->se.cfs_rq, tg->cfs_rq[cpu]);
+	//p->se : 현재 task struct의 se
+	//p->se.cfs_rq : task struct의 se가 큐되어있는 cfs_rq
+	//tg->cfs_rq[cpu] : 어떤 코어가 가지고 있는 cfs_rq
 	p->se.cfs_rq = tg->cfs_rq[cpu];
 	p->se.parent = tg->se[cpu];
 #endif
-
+		
 #ifdef CONFIG_RT_GROUP_SCHED
+	//cfs는 공평한 시간의 세팅을 위해 fair 함수가 필요로 하지만
+	//realtime은 그러한 세팅을 필요로 하지 않음
 	p->rt.rt_rq  = tg->rt_rq[cpu];
 	p->rt.parent = tg->rt_se[cpu];
 #endif
@@ -998,8 +1004,10 @@ static inline void __set_task_cpu(struct task_struct *p, unsigned int cpu)
 	 * successfuly executed on another CPU. We must ensure that updates of
 	 * per-task data have been completed by this moment.
 	 */
-	smp_wmb();
+	smp_wmb();//write 순서를 보장, 컴파일러의 쓰기 순서에 대한 확신이 없기 때문
 	task_thread_info(p)->cpu = cpu;
+	//스레드가 어떤 cpu를 쓰는지 알려주기 위한 구문
+	
 	p->wake_cpu = cpu;
 #endif
 }

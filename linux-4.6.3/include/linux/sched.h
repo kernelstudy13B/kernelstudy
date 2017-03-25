@@ -1212,6 +1212,10 @@ struct load_weight {
  * the highest weight (=88761) always runnable, we should not overflow
  * 2) for entity, support any load.weight always runnable
  */
+//sched entity가 그것의 가중치로 rq에서 실행 가능한 시간을 조절하는 load_avg factors 빈도, cfs_rq를 위해 실행 가능하고 블록되는 sched_entity들의 가중치들이다
+//util_avg는 여러개의 cpu에서도 동작이 가능함
+//load는 컴퓨팅의 양을 구하는 척도,
+//load_avg 특정 기간 안에서 평균 load를 구함
 struct sched_avg {
 	u64 last_update_time, load_sum;
 	u32 util_sum, period_contrib;
@@ -1544,6 +1548,7 @@ struct task_struct {
 		/* Task runs in userspace in a CPU with VTIME active */
 		VTIME_USER,
 		/* Task runs in kernelspace in a CPU with VTIME active */
+		//태스크가 커널공간에서 작동
 		VTIME_SYS,
 	} vtime_snap_whence;
 #endif
@@ -2830,6 +2835,7 @@ static inline void threadgroup_change_end(struct task_struct *tsk)
 
 #define task_thread_info(task)	((struct thread_info *)(task)->stack)
 /*task_struct에 있는 stack 필드를 형변환.*/
+
 /*stack 포인터가 thread_info 필드와 union 형태로서 같은 메모리에서 사용되고 있음.*/
 #define task_stack_page(task)	((task)->stack)
 

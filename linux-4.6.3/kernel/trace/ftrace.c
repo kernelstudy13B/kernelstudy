@@ -5971,6 +5971,7 @@ graph_init_task(struct task_struct *t, struct ftrace_ret_stack *ret_stack)
 /*
  * Allocate a return stack for the idle task. May be the first
  * time through, or it may be done by CPU hotplug online.
+idle 태스크를 위한 리턴스택을 할당,
  */
 void ftrace_graph_init_idle_task(struct task_struct *t, int cpu)
 {

@@ -789,6 +789,7 @@ void vtime_init_idle(struct task_struct *t, int cpu)
 
 	local_irq_save(flags);
 	write_seqcount_begin(&t->vtime_seqcount);
+	//sequence count를 하나 올리고 접근을 막음???
 	t->vtime_snap_whence = VTIME_SYS;
 	t->vtime_snap = jiffies;
 	write_seqcount_end(&t->vtime_seqcount);

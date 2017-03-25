@@ -2647,6 +2647,7 @@ static __always_inline int
 __update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 		  unsigned long weight, int running, struct cfs_rq *cfs_rq)
 {
+	//3번쨰 매개변수를 갱신
 	u64 delta, scaled_delta, periods;
 	u32 contrib;
 	unsigned int delta_w, scaled_delta_w, decayed = 0;
@@ -2777,16 +2778,19 @@ static inline void update_tg_load_avg(struct cfs_rq *cfs_rq, int force)
 void set_task_rq_fair(struct sched_entity *se,
 		      struct cfs_rq *prev, struct cfs_rq *next)
 {
+	//처음 인자는 task struct p의 se, prev는 cfs_rq, next는 cfs_rq[cpu]
 	if (!sched_feat(ATTACH_AGE_LOAD))
 		return;
+	//ATTACH_AGE_LOAD를 enable
 
 	/*
 	 * We are supposed to update the task to "current" time, then its up to
 	 * date and ready to go to new CPU/cfs_rq. But we have difficulty in
 	 * getting what current time is, so simply throw away the out-of-date
 	 * time. This will result in the wakee task is less decayed, but giving
-	 * the wakee more load sounds not bad.
+	 * the wakee more load sounds not bad. 
 	 */
+	//
 	if (se->avg.last_update_time && prev) {
 		u64 p_last_update_time;
 		u64 n_last_update_time;
@@ -2800,15 +2804,22 @@ void set_task_rq_fair(struct sched_entity *se,
 			n_last_update_time_copy = next->load_last_update_time_copy;
 
 			smp_rmb();
+			//rmb : read memory barrier의 약자
+			//smp_rmb() 호출의 앞/뒤 문장에서의 메모리 읽기 순서를 보장
+			//컴파일러나 cpu의 입장에서 앞/뒤 문장이 의존성이 없다고 
+			//판단될 경우 최적화 관점에서 out-of-order execution이 발생
+			//->이런 경우를 원천봉쇄 하고자 사용함.
 
 			p_last_update_time = prev->avg.last_update_time;
 			n_last_update_time = next->avg.last_update_time;
 
 		} while (p_last_update_time != p_last_update_time_copy ||
 			 n_last_update_time != n_last_update_time_copy);
+		//32비트인 경우
 #else
 		p_last_update_time = prev->avg.last_update_time;
 		n_last_update_time = next->avg.last_update_time;
+		//task가 마지막으로 cpu로 들어와서 갱신된 시간???
 #endif
 		__update_load_avg(p_last_update_time, cpu_of(rq_of(prev)),
 				  &se->avg, 0, 0, NULL);
