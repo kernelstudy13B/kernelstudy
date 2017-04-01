@@ -2833,6 +2833,7 @@ static inline void update_tg_load_avg(struct cfs_rq *cfs_rq, int force) {}
 static inline u64 cfs_rq_clock_task(struct cfs_rq *cfs_rq);
 
 /* Group cfs_rq's load_avg is used for task_h_load and update_cfs_share */
+//그룹 cfs_rq의 load avg는 task_h_load와 cfs_share 업데이트에 사용
 static inline int update_cfs_rq_load_avg(u64 now, struct cfs_rq *cfs_rq)
 {
 	struct sched_avg *sa = &cfs_rq->avg;
@@ -2860,6 +2861,7 @@ static inline int update_cfs_rq_load_avg(u64 now, struct cfs_rq *cfs_rq)
 #endif
 
 	return decayed || removed;
+	//
 }
 
 /* Update task and its cfs_rq load average */
@@ -6156,19 +6158,22 @@ static void update_blocked_averages(int cpu)
 	unsigned long flags;
 
 	raw_spin_lock_irqsave(&rq->lock, flags);
-	update_rq_clock(rq);
+	update_rq_clock(rq);//rq_clock은 지속적으로 업데이트 되고 있음
 
 	/*
 	 * Iterates the task_group tree in a bottom up fashion, see
 	 * list_add_leaf_cfs_rq() for details.
 	 */
+	//leaf부터 root 방향으로 태스크그룹 트리(RB트리)를 순회
 	for_each_leaf_cfs_rq(rq, cfs_rq) {
 		/* throttled entities do not contribute to load */
+		//스로틀된 엔티티는 로드에 기여하지 않는다 따라서 스로틀 되면 업데이트를 할 필요가 없다
 		if (throttled_hierarchy(cfs_rq))
 			continue;
 
 		if (update_cfs_rq_load_avg(cfs_rq_clock_task(cfs_rq), cfs_rq))
 			update_tg_load_avg(cfs_rq, 0);
+		//저 함수에서 decayed 나 removed가 true라면 load_avg가 0이 됨
 	}
 	raw_spin_unlock_irqrestore(&rq->lock, flags);
 }
@@ -7216,6 +7221,7 @@ static int load_balance(int this_cpu, struct rq *this_rq,
 	struct rq *busiest;
 	unsigned long flags;
 	struct cpumask *cpus = this_cpu_cpumask_var_ptr(load_balance_mask);
+	//로드 밸런싱을 위해 고려될 cpu들의 집합
 
 	struct lb_env env = {
 		.sd		= sd,
@@ -7478,8 +7484,10 @@ get_sd_balance_interval(struct sched_domain *sd, int cpu_busy)
 		interval *= sd->busy_factor;
 
 	/* scale ms to jiffies */
-	interval = msecs_to_jiffies(interval);
+	interval = msecs_to_jiffies(interval);//초를 jiffies로 바꿈
 	interval = clamp(interval, 1UL, max_load_balance_interval);
+	//max_load_balance_interval에 따라 interval을 정의
+	//clamp : low밑이면 low로, max 넘으면 max로, 사이에 있으면 그 값을 유지
 
 	return interval;
 }
@@ -7825,6 +7833,8 @@ void update_max_interval(void)
  * and initiates a balancing operation if so.
  *
  * Balancing parameters are set up in init_sched_domains.
+ 밸런싱이 될지 안될지를 확인하기 위해 각각의 스케줄링 도메인을 체크하고
+ 만약 벨런싱이 되야 한다면 밸런싱 오퍼레이션을 초기화한다
  */
 static void rebalance_domains(struct rq *rq, enum cpu_idle_type idle)
 {
@@ -7833,7 +7843,8 @@ static void rebalance_domains(struct rq *rq, enum cpu_idle_type idle)
 	unsigned long interval;
 	struct sched_domain *sd;
 	/* Earliest time when we have to do rebalance again */
-	unsigned long next_balance = jiffies + 60*HZ;
+	unsigned long next_balance = jiffies + 60*HZ;//현재버전의 HZ는 1000
+	//클럭이 한번 발생할때마다 jiffies값 증가, 1/1000초당 한번씩 jiffies가 증가
 	int update_next_balance = 0;
 	int need_serialize, need_decay = 0;
 	u64 max_cost = 0;
@@ -7841,14 +7852,20 @@ static void rebalance_domains(struct rq *rq, enum cpu_idle_type idle)
 	update_blocked_averages(cpu);
 
 	rcu_read_lock();
-	for_each_domain(cpu, sd) {
+	for_each_domain(cpu, sd) 
+	{
 		/*
 		 * Decay the newidle max times here because this is a regular
 		 * visit to all the domains. Decay ~1% per second.
+		모든 도메인에 대한 규칙적인 방문이므로 여기서 새로운 idle의 맥스 타임을 decay(값이 줄어듬짐)한다
 		 */
 		if (time_after(jiffies, sd->next_decay_max_lb_cost)) {
+			//두번쨰 인자는 decay의 주기
 			sd->max_newidle_lb_cost =
 				(sd->max_newidle_lb_cost * 253) / 256;
+			//decay되는 수치
+			//decay : cost를 계산하는데 드는 시간을 포함하지 않게 
+			//하기 위해 decay를 시키는 것으로 예측
 			sd->next_decay_max_lb_cost = jiffies + HZ;
 			need_decay = 1;
 		}
@@ -7862,6 +7879,7 @@ static void rebalance_domains(struct rq *rq, enum cpu_idle_type idle)
 		 * CPU in our sched group which is doing load balancing more
 		 * actively.
 		 */
+		//이 레벨에서 로드 밸런싱을 중단. 더 액티브(주기적으로 한다는 것)하게 로드 밸런싱을 하는 sched 그룹 안에 또 다른 cpu가 존재
 		if (!continue_balancing) {
 			if (need_decay)
 				continue;
@@ -7871,6 +7889,7 @@ static void rebalance_domains(struct rq *rq, enum cpu_idle_type idle)
 		interval = get_sd_balance_interval(sd, idle != CPU_IDLE);
 
 		need_serialize = sd->flags & SD_SERIALIZE;
+		//serialize : 직렬화, 런큐가 있으면 수정삭제가 안되게 고정을 시킨다?
 		if (need_serialize) {
 			if (!spin_trylock(&balancing))
 				goto out;
@@ -7887,15 +7906,16 @@ static void rebalance_domains(struct rq *rq, enum cpu_idle_type idle)
 			}
 			sd->last_balance = jiffies;
 			interval = get_sd_balance_interval(sd, idle != CPU_IDLE);
+			//for_each_domain이므로 domain 단위로 도는데 다루는 domain이 interval이 다를수도 있다
 		}
-		if (need_serialize)
+		if (need_serialize)//locking을 위한 플래그 값이라는것을 확인할 수 있음
 			spin_unlock(&balancing);
 out:
 		if (time_after(next_balance, sd->last_balance + interval)) {
 			next_balance = sd->last_balance + interval;
 			update_next_balance = 1;
-		}
-	}
+		}//serialize가 실패햇을떄?, 그러나 공통된 과정
+	}//순회문
 	if (need_decay) {
 		/*
 		 * Ensure the rq-wide value also decays but keep it at a
@@ -7903,6 +7923,7 @@ out:
 		 */
 		rq->max_idle_balance_cost =
 			max((u64)sysctl_sched_migration_cost, max_cost);
+		//두 인자의 가장 큰 값을 비교하여 로드벨런싱 비용으로 간주
 	}
 	rcu_read_unlock();
 
@@ -7910,6 +7931,7 @@ out:
 	 * next_balance will be updated only when there is a need.
 	 * When the cpu is attached to null domain for ex, it will not be
 	 * updated.
+	 next_balance는 필요로 할떄만 업데이트 된다. cpu가 null 도메인(어느 cpu에도 속하지 못하는 도메인?)으로 접근되면 업데이트 되지 않는다
 	 */
 	if (likely(update_next_balance)) {
 		rq->next_balance = next_balance;
@@ -7922,6 +7944,10 @@ out:
 		 * updated accordingly. This CPU is now running the idle load
 		 * balance for itself and we need to update the
 		 * nohz.next_balance accordingly.
+		 만약 현재 cpu가 nohz idle 밸런스를 수행하기 위해 선택되면 다른 idle
+		 cpu들이 nohz_idle_balance()와 함께 리밸런싱한다. 그리고 nohz.next_lalance는 그에따라 업데이트 된다. 
+		 현재 cpu는 자신을 위해 idle load 밸런스를 수행하고 그에따라 
+		 nohz.next_balance를 업데이트해야한다.
 		 */
 		if ((idle == CPU_IDLE) && time_after(nohz.next_balance, rq->next_balance))
 			nohz.next_balance = rq->next_balance;
@@ -7934,12 +7960,15 @@ out:
  * In CONFIG_NO_HZ_COMMON case, the idle balance kickee will do the
  * rebalancing for all the cpus for whom scheduler ticks are stopped.
  */
+//idle balance kickee는 스케줄러 킥이 정지된 모든 cpu를 위해 리밸런싱 할것이다
 static void nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type idle)
 {
+	//tickless system에사 하나의 CPU는 모든 idle CPU들을 위해 로드 밸런싱을 한다 이 cpu의 cpu_load는 각각 다른 idle CPU들의 로드밸런싱을 시작하기 전 업데이트 된다. balance_xpu의 cpu_load를 업데이트 해야한다
 	int this_cpu = this_rq->cpu;
 	struct rq *rq;
 	int balance_cpu;
 	/* Earliest time when we have to do rebalance again */
+	//다시 리밸런스 해야할 가장 빠른 시간
 	unsigned long next_balance = jiffies + 60*HZ;
 	int update_next_balance = 0;
 
@@ -7947,14 +7976,19 @@ static void nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type idle)
 	    !test_bit(NOHZ_BALANCE_KICK, nohz_flags(this_cpu)))
 		goto end;
 
+	//로드밸런싱
 	for_each_cpu(balance_cpu, nohz.idle_cpus_mask) {
 		if (balance_cpu == this_cpu || !idle_cpu(balance_cpu))
 			continue;
+		//balance_cpu가 this_cpu와 같거나(this_cpu는 로드밸런싱 대상이 아님)
+		//balance_cpu가 idle상태의 cpu가 아니라면 continue
 
 		/*
 		 * If this cpu gets work to do, stop the load balancing
 		 * work being done for other cpus. Next load
 		 * balancing owner will pick it up.
+		 만약 현재 cpu가 해야 할 작업이 생기면 다른 cpu에 수행되는
+		 로드밸런싱 작업을 중단한다. 다음 로드밸런싱 오너는 이를 획득
 		 */
 		if (need_resched())
 			break;
@@ -7964,11 +7998,13 @@ static void nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type idle)
 		/*
 		 * If time for next balance is due,
 		 * do the balance.
+		 다음 밸런싱을 위한 시간이 되면 밸런싱 수행
 		 */
+		//time_after_rq(a,b) : a가 b보다 나중이거나 같은시간이면 true
 		if (time_after_eq(jiffies, rq->next_balance)) {
 			raw_spin_lock_irq(&rq->lock);
-			update_rq_clock(rq);
-			update_cpu_load_idle(rq);
+			update_rq_clock(rq);//rq_clock 업데이트
+			update_cpu_load_idle(rq);//cpu_load_idle 업데이트
 			raw_spin_unlock_irq(&rq->lock);
 			rebalance_domains(rq, CPU_IDLE);
 		}
@@ -8073,6 +8109,9 @@ static void nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type idle) { }
  * run_rebalance_domains is triggered when needed from the scheduler tick.
  * Also triggered for nohz idle balancing (with nohz_balancing_kick set).
  */
+//스케줄러 틱으로부터 필요할 때 불려진다. 또한 nohz idle 밸런싱을 위해서 불려짐
+//NoHz = tickless kernel(측정불가>)
+//tickless kernel : 예전 커널은 플랫포에 따라 미리 정해진 주파수, 오래된 주기적인 타이머를 on demand 인터럽트로 돌아가게 함, 전원절약 효과 차원
 static void run_rebalance_domains(struct softirq_action *h)
 {
 	struct rq *this_rq = this_rq();
@@ -8087,8 +8126,13 @@ static void run_rebalance_domains(struct softirq_action *h)
 	 * load balance only within the local sched_domain hierarchy
 	 * and abort nohz_idle_balance altogether if we pull some load.
 	 */
-	nohz_idle_balance(this_rq, idle);
-	rebalance_domains(this_rq, idle);
+	//만약 이 cpu가 끝나지 않은 nohz balance kick을 가지고 있다면 틱이 멈춰지는 다른 idle cpus를 대신하여 밸런싱을 한다. 
+	//스케줄링 될수 있는 도메인은 정해져있는 듯(local sched_domain 계층)
+
+	nohz_idle_balance(this_rq, idle);//idle cpu에 대한 로드 밸런싱
+	rebalance_domains(this_rq, idle);//지금 cpu에 대한 로드 밸런싱
+	//nohz 아이들 밸런스를 먼저 하는 이유는 아이들 cpu에게 로드밸런스를 할 기회를 주기 위해서이다, 그외에 오직 로컬 sched_domain 계층내에서만 로드 밸런스를 할 수 있다.
+	//그렇지 못하면 로컬 sched_domain을 대상으로 로드밸런싱을 한다
 }
 
 /*

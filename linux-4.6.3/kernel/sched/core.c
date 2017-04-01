@@ -3635,7 +3635,7 @@ int task_prio(const struct task_struct *p)
  *
  * Return: 1 if the CPU is currently idle. 0 otherwise.
  */
-int idle_cpu(int cpu)
+int idle_cpu(int cpu)//매개변수로 들어온 cpu가 현재 idle상태인지를 판별
 {
 	struct rq *rq = cpu_rq(cpu);
 
@@ -5479,9 +5479,10 @@ static struct notifier_block migration_notifier = {
 
 static void set_cpu_rq_start_time(void)
 {
-	int cpu = smp_processor_id();
-	struct rq *rq = cpu_rq(cpu);
+	int cpu = smp_processor_id();//현재 cpu 넘버 가져옴
+	struct rq *rq = cpu_rq(cpu);//그 cpu와 링크된 스케줄링의 런큐를 가져옴
 	rq->age_stamp = sched_clock_cpu(cpu);
+	//sched_clock 시간이 큰 값에 시작한다면 rq->age_stamp가 rq->clock을 따라잡는 동안 커널은 긴시간 동안 sched_avg_update안에서 스핀할것이다.
 }
 
 static int sched_cpu_active(struct notifier_block *nfb,
@@ -7508,8 +7509,8 @@ void __init sched_init(void)
 	/* May be allocated at isolcpus cmdline parse time */
 	if (cpu_isolated_map == NULL)
 		zalloc_cpumask_var(&cpu_isolated_map, GFP_NOWAIT);
-	idle_thread_set_boot_cpu();
-	set_cpu_rq_start_time();
+	idle_thread_set_boot_cpu();//170325
+	set_cpu_rq_start_time();//age->stamp와 clock에 대한 함수
 #endif
 	init_sched_fair_class();
 

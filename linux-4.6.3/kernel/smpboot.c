@@ -38,6 +38,8 @@ struct task_struct *idle_thread_get(unsigned int cpu)
 void __init idle_thread_set_boot_cpu(void)
 {
 	per_cpu(idle_threads, smp_processor_id()) = current;
+	//per_cpu : 커널의 메모리 관리 기법 중 하나, 안전하고 빠르게 데이터에 접근하는 기법
+	//
 }
 
 /**

@@ -3103,6 +3103,7 @@ static inline void current_clr_polling(void)
 
 static __always_inline bool need_resched(void)
 {
+	//리스케줄링이 필요한가?
 	return unlikely(tif_need_resched());
 }
 
