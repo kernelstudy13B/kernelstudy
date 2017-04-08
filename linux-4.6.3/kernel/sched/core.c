@@ -6030,6 +6030,7 @@ static void build_group_mask(struct sched_domain *sd, struct sched_group *sg)
  * Return the canonical balance cpu for this group, this is the first cpu
  * of this group that's also in the iteration mask.
  */
+//이 sg를 위해 표준이 되는 balance cpu를 리턴한다, 이는 iteration mask내에도 존재하는 이 그룹의 첫번쨰 cpu이다
 int group_balance_cpu(struct sched_group *sg)
 {
 	return cpumask_first_and(sched_group_cpus(sg), sched_group_mask(sg));

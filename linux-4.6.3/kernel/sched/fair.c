@@ -6294,6 +6294,8 @@ static inline void init_sd_lb_stats(struct sd_lb_stats *sds)
 	 * local_stat because update_sg_lb_stats() does a full clear/assignment.
 	 * We must however clear busiest_stat::avg_load because
 	 * update_sd_pick_busiest() reads this before assignment.
+	 work 복제를 피하기 위해 clearing을 절약. update_sg_lb_stats 함수가 full clear/assignment를 수행하기 때문에 local_stat clearing을 피할수 있다.
+	 그러나 update_sd_pick_busiest 함수가 할당(assignment) 이전에 avg_load를 읽기 때문에 buesiest_stat:avg_load를 클리어해야한다.
 	 */
 	*sds = (struct sd_lb_stats){
 		.busiest = NULL,
@@ -6313,6 +6315,9 @@ static inline void init_sd_lb_stats(struct sd_lb_stats *sds)
  * @sd: The sched_domain whose load_idx is to be obtained.
  * @idle: The idle status of the CPU for whose sd load_idx is obtained.
  *
+   주어진 sched domain을 위해 load 인덱스를 얻는다
+   매개변수 sd는 획득될 load_idex를 가지는 sched domain
+
  * Return: The load index.
  */
 static inline int get_sd_load_idx(struct sched_domain *sd,
@@ -6328,7 +6333,7 @@ static inline int get_sd_load_idx(struct sched_domain *sd,
 	case CPU_NEWLY_IDLE:
 		load_idx = sd->newidle_idx;
 		break;
-	default:
+	default://CPU_IDLE, CPU_MAX_IDLE_TYPE
 		load_idx = sd->idle_idx;
 		break;
 	}
@@ -6701,15 +6706,20 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
 	int load_idx, prefer_sibling = 0;
 	bool overload = false;
 
+	//Prefer to place tasks in a sibling domain
+	//시블링 도메인에 태스크를 놓는것을 선호하다
+	//한 도메인에 태스크를 나누는것이 가능.
 	if (child && child->flags & SD_PREFER_SIBLING)
 		prefer_sibling = 1;
 
+	//load_idx : 로드를 계산하기 위한 값
 	load_idx = get_sd_load_idx(env->sd, env->idle);
 
 	do {
 		struct sg_lb_stats *sgs = &tmp_sgs;
 		int local_group;
 
+		//local_group : dst_cpu가 속한 그룹
 		local_group = cpumask_test_cpu(env->dst_cpu, sched_group_cpus(sg));
 		if (local_group) {
 			sds->local = sg;
@@ -6962,9 +6972,10 @@ static inline void calculate_imbalance(struct lb_env *env, struct sd_lb_stats *s
  * the user has opted for power-savings, it returns a group whose
  * CPUs can be put to idle by rebalancing those tasks elsewhere, if
  * such a group exists.
- *
  * Also calculates the amount of weighted load which should be moved
  * to restore balance.
+ imbalance가 있다면 sched_domain 내의 가장 바쁜 그룹을 리턴한다. 그리고 유저는 power-savings을 위해 선택한다, 그외의 태스크들을 리밸런싱함으로써 idle에 놓여지는 cpu를 가지는 그룹을 리턴한다.
+ 또한 밸런스를 restore하기 위해 이동되야하는 load의 양을 계산
  *
  * @env: The load balancing environment.
  *
@@ -6972,17 +6983,20 @@ static inline void calculate_imbalance(struct lb_env *env, struct sd_lb_stats *s
  *		- If no imbalance and user has opted for power-savings balance,
  *		   return the least loaded group whose CPUs can be
  *		   put to idle by rebalancing its tasks onto our group.
+ imbalance가 존재,
+ imbalance가 없고 유저가 power-savings balance를 위해 선택한다면, 그룹내에 태스크들을 리밸런싱함으로써 idle 프로세스에 놓여지는 cpu들을 가장 적게 로드하는 그룹을 리턴
  */
 static struct sched_group *find_busiest_group(struct lb_env *env)
 {
 	struct sg_lb_stats *local, *busiest;
 	struct sd_lb_stats sds;
 
-	init_sd_lb_stats(&sds);
+	init_sd_lb_stats(&sds);//busiest_stat::avg_load를 초기화
 
 	/*
 	 * Compute the various statistics relavent for load balancing at
 	 * this level.
+	 이 레벨에서 로드 밸런싱을 위해 연관된 다양한 statistics를 계산
 	 */
 	update_sd_lb_stats(env, &sds);
 	local = &sds.local_stat;
@@ -7182,35 +7196,52 @@ static int should_we_balance(struct lb_env *env)
 	/*
 	 * In the newly idle case, we will allow all the cpu's
 	 * to do the newly idle load balance.
+	 새롭게 idle 되는 케이스의 경우 모든 cpu들이 새로운 idle 로드밸런스 하는것을 허용
 	 */
 	if (env->idle == CPU_NEWLY_IDLE)
 		return 1;
 
-	sg_cpus = sched_group_cpus(sg);
-	sg_mask = sched_group_mask(sg);
+	sg_cpus = sched_group_cpus(sg);//sg(sched group)의 cpu들의 비트마스크를 가져옴
+	sg_mask = sched_group_mask(sg);//??
 	/* Try to find first idle cpu */
+	//첫 idle cpu를 찾는다
 	for_each_cpu_and(cpu, sg_cpus, env->cpus) {
-		if (!cpumask_test_cpu(cpu, sg_mask) || !idle_cpu(cpu))
+		if (!cpumask_test_cpu(cpu, sg_mask) || !idle_cpu(cpu)
 			continue;
+		//cpumask_test_cpu : cpumask 내부의 cpu를 위해 테스트하여 T or F를 도출
+		//idle_cpu : 이 cpu가 idle cpu인가?
+		//1. 인자로 들어온 cpu가 idle이 아니라면
+		//2. cpumask 테스트가 false라면
+		//break 하지 않고 계속 반복
 
 		balance_cpu = cpu;
+		//if 조건을 모두 충족하면(cpu가 idle이고 마스킹이 true)
 		break;
 	}
 
 	if (balance_cpu == -1)
 		balance_cpu = group_balance_cpu(sg);
+		//balance cpu가 앞의 반복문에서 정해지지 않았다면 그 그룹의 첫번째 cpu가 balance cpu가 된다
 
 	/*
 	 * First idle cpu or the first cpu(busiest) in this sched group
 	 * is eligible for doing load balancing at this and above domains.
+	 //첫번쨰 idle cpu(포문에서 찾아야함)나 sched group에서 가장 바쁜 첫번쨰 cpu(balance_cpu가 -1일때 다시 설정하는 것)는 이 도메인에서 로드밸런싱을 할 자격을 갖춘다
 	 */
 	return balance_cpu == env->dst_cpu;
+	//balance_cpu가 어떤 값으로 지정되고 그 값이 env에 지정된 cpu와 같다면 밸런싱을 해야함
+	//dst_cpu는 로드밸런싱 함수가 호출되기 전 domain을 순회하면서 그 domain의 cpu가 판별된 balance_cpu와 같다면 밸런스를 해야한다고(true) 판별
 }
 
 /*
  * Check this_cpu to ensure it is balanced within domain. Attempt to move
  * tasks if there is an imbalance.
+ this_cpu가 도메인내에서 벨런싱 되었는지를 확인, 만약 imbalance가 존재하면 태스크를 이동시킴
+
+imbalance : 얼마나 밸런싱 되어있지 않는가를 확인
+move_task시에 계산된 imbalance 기준으로 load의 +,-가 이루어지고 이 값을 가지고 migration을 할지 결정
  */
+
 static int load_balance(int this_cpu, struct rq *this_rq,
 			struct sched_domain *sd, enum cpu_idle_type idle,
 			int *continue_balancing)
@@ -7238,18 +7269,23 @@ static int load_balance(int this_cpu, struct rq *this_rq,
 	/*
 	 * For NEWLY_IDLE load_balancing, we don't need to consider
 	 * other cpus in our group
+	 NEWLY_IDLE 로드밸런싱을 위해 our group에서 다른 cpu를 고려할 필요가 없다.
 	 */
 	if (idle == CPU_NEWLY_IDLE)
 		env.dst_grpmask = NULL;
+	
 
 	cpumask_copy(cpus, cpu_active_mask);
+	//cpu_active_mask의 비트 == cpus의 비트
 
 	schedstat_inc(sd, lb_count[idle]);
+	//CPU_MAX_IDLE_TYPES : 
 
 redo:
 	if (!should_we_balance(&env)) {
 		*continue_balancing = 0;
 		goto out_balanced;
+		//out_balanced : 밸런스를 할 필요가 없으므로 imbalance 비트를 초기화
 	}
 
 	group = find_busiest_group(&env);
@@ -7445,6 +7481,8 @@ out_balanced:
 	/*
 	 * We reach balance although we may have faced some affinity
 	 * constraints. Clear the imbalance flag if it was set.
+	 affinity의 제한을 겪을지라도 밸런싱을 했다는 뜻.
+	 따라서 세팅이 되있다면 imbalance 비트 클리어
 	 */
 	if (sd_parent) {
 		int *group_imbalance = &sd_parent->groups->sgc->imbalance;

@@ -900,6 +900,7 @@ static inline struct cpumask *sched_group_cpus(struct sched_group *sg)
 /*
  * cpumask masking which cpus in the group are allowed to iterate up the domain
  * tree.
+ 그룹의 cpus가 도메인 트리위에서 순회하는 것을 허용하는 cpumask 마스킹
  */
 static inline struct cpumask *sched_group_mask(struct sched_group *sg)
 {
