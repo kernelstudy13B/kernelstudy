@@ -1450,6 +1450,10 @@ static __always_inline
 unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
 {
 	if (sd && (sd->flags & SD_SHARE_CPUCAPACITY) && (sd->span_weight > 1))
+		//1.sd가 존재
+		//2.SD_SHARE_CPUCAPACITY는 sd의 플래그와 비트마스킹이 되어야함
+		//3.span_weight가 1보다 커야함
+		//(span_weight - 커널이 얼마나 많은 cpu에 의존하는가에 대한 수치
 		return sd->smt_gain / sd->span_weight;
 
 	return SCHED_CAPACITY_SCALE;

@@ -4671,6 +4671,7 @@ void update_cpu_load_active(struct rq *this_rq)
  *
  * We want to under-estimate the load of migration sources, to
  * balance conservatively.
+ 보수적으로 밸런싱 하기 위해 migration 소스의 로드값을 과소평가 하길 원함
  */
 static unsigned long source_load(int cpu, int type)
 {
@@ -4686,6 +4687,7 @@ static unsigned long source_load(int cpu, int type)
 /*
  * Return a high guess at the load of a migration-target cpu weighted
  * according to the scheduling class and "nice" value.
+ 스케줄링 클래스와 nice 값에 따라 가중치가 적용된 migration 타겟 cpu의 로드값의 가장 큰 추측값을 리턴한다.
  */
 static unsigned long target_load(int cpu, int type)
 {
@@ -6387,8 +6389,9 @@ static void update_cpu_capacity(struct sched_domain *sd, int cpu)
 
 void update_group_capacity(struct sched_domain *sd, int cpu)
 {
-	struct sched_domain *child = sd->child;
+	struct sched_domain *child = sd->child;//도메인의 차일드
 	struct sched_group *group, *sdg = sd->groups;
+	//일반 그룹을나타낼 변수와 도메인의 그룹
 	unsigned long capacity;
 	unsigned long interval;
 
@@ -6407,6 +6410,7 @@ void update_group_capacity(struct sched_domain *sd, int cpu)
 		/*
 		 * SD_OVERLAP domains cannot assume that child groups
 		 * span the current group.
+		 SD_OVERLAP과 관련된 도메인들은 child groups가 현재 그룹을 걸쳐있다는 것을 추정할수가 없다.
 		 */
 
 		for_each_cpu(cpu, sched_group_cpus(sdg)) {
@@ -6555,6 +6559,7 @@ group_type group_classify(struct sched_group *group,
 
 /**
  * update_sg_lb_stats - Update sched_group's statistics for load balancing.
+ 로드밸런싱을 위해 sched_group의 statistics를 업데이트
  * @env: The load balancing environment.
  * @group: sched_group whose statistics are to be updated.
  * @load_idx: Load index of sched_domain of this_cpu for load calc.
@@ -6576,10 +6581,11 @@ static inline void update_sg_lb_stats(struct lb_env *env,
 		struct rq *rq = cpu_rq(i);
 
 		/* Bias balancing toward cpus of our domain */
+		//도메인의 cpus을 향해  bias 밸런싱
 		if (local_group)
-			load = target_load(i, load_idx);
+			load = target_load(i, load_idx);//cpu 로드값의 high guess 리턴
 		else
-			load = source_load(i, load_idx);
+			load = source_load(i, load_idx);//cpu 로드값의 low guess 리턴
 
 		sgs->group_load += load;
 		sgs->group_util += cpu_util(i);
@@ -6722,17 +6728,20 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
 		//local_group : dst_cpu가 속한 그룹
 		local_group = cpumask_test_cpu(env->dst_cpu, sched_group_cpus(sg));
 		if (local_group) {
-			sds->local = sg;
+			sds->local = sg;//환경변수의 sg를 sds->local에 삽입
 			sgs = &sds->local_stat;
-
+			//환경변수의 sds->local_stat에 sgs내용을 삽입
+			//즉 그룹과 도메인 간의 관계를 나타내는 코드??
 			if (env->idle != CPU_NEWLY_IDLE ||
 			    time_after_eq(jiffies, sg->sgc->next_update))
+				//환경변수의 IDLE 상태가 NEWLY_IDLE이 아니거나
+				//jiffies가 sg->sgc->next_update 값보다 크거나 같으면
 				update_group_capacity(env->sd, env->dst_cpu);
 		}
 
 		update_sg_lb_stats(env, sg, load_idx, local_group, sgs,
 						&overload);
-
+		//즉 가장 바쁜 그룹을 찾기위해 sched domain을 초기화, 업데이트하고 그 밑 레벨인 sched group의 statistics를  다시 업데이트
 		if (local_group)
 			goto next_group;
 
@@ -6745,16 +6754,27 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
 		 * you always pull from the heaviest group when it is already
 		 * under-utilized (possible with a large weight task outweighs
 		 * the tasks on the system).
-		 */
+		 child domain은 태스크가 sibling으로 가는것을 선호하는 경우
+		 먼저 모든 excess 태스크들을 시도하고 이동시키기 위해 sg capacity를 낮춘다.
+		 만약 로컬 그룹이 excess 태스크들에 알맞는 capacity를 가진다면 capacity를
+	         낮춘다. 그외의 체킹은 이미 under-utilized(시스템에서 태스크보다 더 큰 태
+	         스크와 함께 가능한)된 가장 무거운 그룹으로 밀어내는 상황을 막는다.	 
+		 *///local_group이 정의가 안된경우
 		if (prefer_sibling && sds->local &&
 		    group_has_capacity(env, &sds->local_stat) &&
-		    (sgs->sum_nr_running > 1)) {
+		    (sgs->sum_nr_running > 1)) 
+			//prefer_sibling 가능
+			//sched domain의 local이 존재
+			//태스크에 사용될 spare capacity를 그룹이 가지고 있는가?
+			//sched group의 그룹에서 작동중인 태스크가 1개 이상인가?
+		{
 			sgs->group_no_capacity = 1;
 			sgs->group_type = group_classify(sg, sgs);
 		}
 
 		if (update_sd_pick_busiest(env, sds, sg, sgs)) {
-			sds->busiest = sg;
+			//가장 바쁜 그룹에 1을 리턴
+			sds->busiest = sg;//정해진 sched group을 sched domain의 busiest에 넣음, buseist도 그룹의 형태
 			sds->busiest_stat = *sgs;
 		}
 
@@ -6765,6 +6785,7 @@ next_group:
 
 		sg = sg->next;
 	} while (sg != env->sd->groups);
+	//환경변수에 있는 sched_domain에 모든 그룹을 순회하여 위 과정을 모두 수행
 
 	if (env->sd->flags & SD_NUMA)
 		env->fbq_type = fbq_classify_group(&sds->busiest_stat);
@@ -6793,7 +6814,8 @@ next_group:
  * CPU number than the packing function is being run on.  Here we are
  * assuming lower CPU number will be equivalent to lower a SMT thread
  * number.
- *
+ *idle 스레드에서는 패킹함수가 작동됨, 도메인 내 buseist cpu가 패킹 함수가 작동된 높은 CPU
+ 번호를 가지는지 확인. 여기에서 더낮은 cpu 넘버가 SMT 스레드 넘버를 낮추기 위해 동등해야 한다고 가정할 수 있다.
  * Return: 1 when packing is required and a task should be moved to
  * this CPU.  The amount of the imbalance is returned in *imbalance.
  *
@@ -6894,6 +6916,7 @@ void fix_small_imbalance(struct lb_env *env, struct sd_lb_stats *sds)
 /**
  * calculate_imbalance - Calculate the amount of imbalance present within the
  *			 groups of a given sched_domain during load balance.
+ //로드 밸런싱 하는 동안 주어진 sched domain의 그룹 내에 현재 imbalance의 양을 계산
  * @env: load balance environment
  * @sds: statistics of the sched_domain whose imbalance is to be calculated.
  */
@@ -6909,6 +6932,8 @@ static inline void calculate_imbalance(struct lb_env *env, struct sd_lb_stats *s
 		/*
 		 * In the group_imb case we cannot rely on group-wide averages
 		 * to ensure cpu-load equilibrium, look at wider averages. XXX
+		 group_imb 경우 cpu-load 평행을 보장하기 위해 그룹와이드 평균값을 의존할수
+		 없다.
 		 */
 		busiest->load_per_task =
 			min(busiest->load_per_task, sds->avg_load);
@@ -6999,44 +7024,63 @@ static struct sched_group *find_busiest_group(struct lb_env *env)
 	 이 레벨에서 로드 밸런싱을 위해 연관된 다양한 statistics를 계산
 	 */
 	update_sd_lb_stats(env, &sds);
+	//가장 바쁜 그룹을 찾기 위해 sched domain의 statistics를 초기화
+	//이 함수 안에서 결국 sched group의 statistics도 초기화한다
 	local = &sds.local_stat;
 	busiest = &sds.busiest_stat;
+	//sched domain안에 sched group이 있고 buseist group이 어떻게 판별될지를 위 과정을 통해 알게 되었으므로 local과 busiest는 도메인 레벨로 정해진다
 
 	/* ASYM feature bypasses nice load balance check */
+	// ASYM(비대칭) 특징은 nice load balance check를 우회한다.
+	// ASYM 특징을 이용해서 buseist 그룹을 찾는 방법
 	if ((env->idle == CPU_IDLE || env->idle == CPU_NEWLY_IDLE) &&
 	    check_asym_packing(env, &sds))
+		//환경변수 idle 상태, 또는 newly idle 상태 그리고 그룹이 sched_domain으로 packing이 되는지를 확인
 		return sds.busiest;
 
 	/* There is no busy sibling group to pull tasks from */
+	//태스크를 당겨올 바쁜 sibling 그룹이 없다
 	if (!sds.busiest || busiest->sum_nr_running == 0)
+		//도메인 내에서 정해진 buseist 그룹이 없거나
+		//busiest 그룹은 존재하되 그 그룹내에서 러닝중인 태스크가 없다면
 		goto out_balanced;
 
 	sds.avg_load = (SCHED_CAPACITY_SCALE * sds.total_load)
 						/ sds.total_capacity;
+	//평균 로드값을 구함
 
 	/*
 	 * If the busiest group is imbalanced the below checks don't
 	 * work because they assume all things are equal, which typically
 	 * isn't true due to cpus_allowed constraints and the like.
+	 busiest 그룹이 균형이 맞춰져있지 않다면 아래 if문 체킹을 하지 않는다. 왜냐하면 모든 그룹이 동등하다고 추정하기 때문이고, 일반적으로 cpu_allowed 제한과 like 때문에 동등하지 않다.
 	 */
 	if (busiest->group_type == group_imbalanced)
 		goto force_balance;
 
 	/* SD_BALANCE_NEWIDLE trumps SMP nice when underutilized */
+	//충분히 쓰여지지 않았을때 SD_BALANCE_NEWIDLE은 SMP nice를 이용해서 무언가한다
+	//SD_BALANCE_NEWIDLE : IDLE상태가 되려고 할떄 balance하겟다...
 	if (env->idle == CPU_NEWLY_IDLE && group_has_capacity(env, local) &&
 	    busiest->group_no_capacity)
+		//몇몇 태스크에서 사용될수 있는 여분의 capacity를 사용한다면
+		//busiest 그룹에서 capacity가 없다면 (즉 다른 태스크에서는 여분의 capacity데 정작 busiest 그룹에선 capacity가 없는 imbalance 상황
 		goto force_balance;
 
 	/*
 	 * If the local group is busier than the selected busiest group
 	 * don't try and pull any tasks.
+	 로컬 그룹이 선택된 buseist 그룹보다 더 바쁘면 어떠한 태스크를 실행하거나 pull
+	 하지 않는다.
 	 */
+	//busiest의 avg_load가 더 작다는건 결국 busiest는 local이어야 정상
 	if (local->avg_load >= busiest->avg_load)
 		goto out_balanced;
 
 	/*
 	 * Don't pull any tasks if this group is already above the domain
 	 * average load.
+	 만약 이 그룹이 도메인 평균보다 더 상위라면 태스크를 pull 하지 않는다
 	 */
 	if (local->avg_load >= sds.avg_load)
 		goto out_balanced;
@@ -7048,17 +7092,25 @@ static struct sched_group *find_busiest_group(struct lb_env *env)
 		 * wrt idle cpus, it is balanced. The imbalance becomes
 		 * significant if the diff is greater than 1 otherwise we
 		 * might end up to just move the imbalance on another group
+		 현재 cpu는 idle 상태. 만약 busiest 그룹이 오버로드되지 않고
+		 idle cpus에 대해 local 그룹과 busiest그룹사이에 불균형이없다면
+		 balanced 되어있는것. 이 imbalance는 만약 차이가 1보다 더 커지면 중요해지고
+		 그렇지 않으면 다른그룹의 imbalance를 움직이는것을 끝낼수 있다 
 		 */
 		if ((busiest->group_type != group_overloaded) &&
 				(local->idle_cpus <= (busiest->idle_cpus + 1)))
+			//busiest의 그룹타입이 오버로드가 아니고
+			//local의 idle_cpus가 busiest의 idle_cpus보다 더 작을떄
 			goto out_balanced;
 	} else {
 		/*
 		 * In the CPU_NEWLY_IDLE, CPU_NOT_IDLE cases, use
 		 * imbalance_pct to be conservative.
+		   imbalance_pct : balancing을 수행할 threshhold를 조절하는데 사용.
 		 */
 		if (100 * busiest->avg_load <=
 				env->sd->imbalance_pct * local->avg_load)
+			//local의 로드가 훨씬 크다는 뜻.
 			goto out_balanced;
 	}
 
