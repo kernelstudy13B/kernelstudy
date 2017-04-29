@@ -603,11 +603,21 @@ asmlinkage __visible void __init start_kernel(void) //called by head.S
 	 * fragile until we cpu_idle() for the first time.
 	 */
 	preempt_disable();
+	//기본 arm 리눅스의 멀티태스킹은 preemtive multitasking
+	//preemtive multitasking : 어떤 스레드가 실행되다가 다른 스레드가 끼어들어 실행될수 있는 구조
+	//그러나 임계구역에서 스레드가 갑자기 바뀌면 동기화문제가 발생할수 있기때문에 일시적으로 disable시켜야 할 떄가 있다.
+
+	//current_thread_info의 preemptive count +1해주고
+	//barrier()을 이용해 preempt_disable을 기점으로 뒤의 명령들과 앞의 명령들이 섞이지 않도록 장벽을 쳐줌. barrier()는 메모리의 순차적 실행을 보장해줌
 	if (WARN(!irqs_disabled(),
 		 "Interrupts were enabled *very* early, fixing it\n"))
 		local_irq_disable();
-	idr_init_cache();
+		//preemtive_disable은 인터럽트가 끼어드는것을 허용하지만 local_irq_disable
+		//인터럽트도 막는다
+	idr_init_cache();//idr(현재 단계에서 쓰이지 않는 일종의 데이터구조)을 위한 캐시 초기화
 	rcu_init();
+	//rcu 사용을 위해 구조체 초기화,cpu 및 pm 상태 변화에 따라 호출되는 각 함수들을 
+	//notify chain block에 등록, rcu 동작에 필요한 스레드들을 동작
 
 	/* trace_printk() and trace points may be used after this */
 	trace_init();

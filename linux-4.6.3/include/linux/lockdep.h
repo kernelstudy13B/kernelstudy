@@ -46,6 +46,7 @@ extern int lock_stat;
  * Lock-classes are keyed via unique addresses, by embedding the
  * lockclass-key into the kernel (or module) .data section. (For
  * static locks we use the lock address itself as the key.)
+ Lock-classes는 고유 주소를 경유하고 커널 또는 모듈로 lockclass-key를 내장함으로써 입력된다.
  */
 struct lockdep_subclass_key {
 	char __one_byte;

@@ -824,6 +824,7 @@ EXPORT_SYMBOL(idr_replace);
 
 void __init idr_init_cache(void)
 {
+	//IDR : 일종의 라이브러리, idr은 start_kernel에서 쓰이는 경우가 없다. 
 	idr_layer_cache = kmem_cache_create("idr_layer_cache",
 				sizeof(struct idr_layer), 0, SLAB_PANIC, NULL);
 }

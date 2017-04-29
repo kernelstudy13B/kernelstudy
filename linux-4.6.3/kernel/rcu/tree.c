@@ -4391,13 +4391,15 @@ void rcu_scheduler_starting(void)
 /*
  * Compute the per-level fanout, either using the exact fanout specified
  * or balancing the tree, depending on the rcu_fanout_exact boot parameter.
- */
+ 정확한 특정 팬아웃을 사용하거나 트리 밸런싱을 사용하여 레벨당 팬아웃을 계산,
+ 각 rcu 레벨이 관리하는 sub 노드 수를 판별*/
 static void __init rcu_init_levelspread(int *levelspread, const int *levelcnt)
 {
 	int i;
 
 	if (rcu_fanout_exact) {
 		levelspread[rcu_num_lvls - 1] = rcu_fanout_leaf;
+
 		for (i = rcu_num_lvls - 2; i >= 0; i--)
 			levelspread[i] = RCU_FANOUT;
 	} else {
@@ -4421,9 +4423,11 @@ static void __init rcu_init_one(struct rcu_state *rsp)
 	static const char * const buf[] = RCU_NODE_NAME_INIT;
 	static const char * const fqs[] = RCU_FQS_NAME_INIT;
 	static const char * const exp[] = RCU_EXP_NAME_INIT;
+	//rcu 디버깅에 사용되는 문자열,최대 rcu 표기
 	static struct lock_class_key rcu_node_class[RCU_NUM_LVLS];
 	static struct lock_class_key rcu_fqs_class[RCU_NUM_LVLS];
 	static struct lock_class_key rcu_exp_class[RCU_NUM_LVLS];
+	//lock_class_key : lock 의존성 검사를 위한 구조체
 	static u8 fl_mask = 0x1;
 
 	int levelcnt[RCU_NUM_LVLS];		/* # nodes in each level. */
@@ -4435,7 +4439,7 @@ static void __init rcu_init_one(struct rcu_state *rsp)
 
 	BUILD_BUG_ON(RCU_NUM_LVLS > ARRAY_SIZE(buf));  /* Fix buf[] init! */
 
-	/* Silence gcc 4.8 false positive about array index out of range. */
+	/* Silence gcc 4.8 false positive// about array index out of range. */
 	if (rcu_num_lvls <= 0 || rcu_num_lvls > RCU_NUM_LVLS)
 		panic("rcu_init_one: rcu_num_lvls out of range");
 
@@ -4443,13 +4447,16 @@ static void __init rcu_init_one(struct rcu_state *rsp)
 
 	for (i = 0; i < rcu_num_lvls; i++)
 		levelcnt[i] = num_rcu_lvl[i];
+	//전역 num_rcu_lvl[]에 저장된 값을 levelcnt[]에 rcu 레벨 수 만큼 복사한다.
 	for (i = 1; i < rcu_num_lvls; i++)
 		rsp->level[i] = rsp->level[i - 1] + levelcnt[i - 1];
+	//rsp->level[]은 각 레벨이 시작하는 rcu_node를 가리키게 한다.
 	rcu_init_levelspread(levelspread, levelcnt);
 	rsp->flavor_mask = fl_mask;
 	fl_mask <<= 1;
 
 	/* Initialize the elements themselves, starting from the leaves. */
+	//리프노드들로부터 시작해서 같은 element들을 초기화
 
 	for (i = rcu_num_lvls - 1; i >= 0; i--) {
 		cpustride *= levelspread[i];
@@ -4505,8 +4512,11 @@ static void __init rcu_init_one(struct rcu_state *rsp)
  * replace the definitions in tree.h because those are needed to size
  * the ->node array in the rcu_state structure.
  */
+//rcu_state 구조에서 ->node 배열 사이즈를 필요로 하기 때문에 tree.h의 정의를 대체할수 없다
 static void __init rcu_init_geometry(void)
 {
+	//이 함수에서 rcu 노드 구조의 총 합을 구해야 하고
+	//이를 첫 fqs에서 다음 fqs까지의 jiffies 계산과 함께 시작한다.
 	ulong d;
 	int i;
 	int rcu_capacity[RCU_NUM_LVLS];
@@ -4517,17 +4527,23 @@ static void __init rcu_init_geometry(void)
 	 * jiffies_till_next_fqs are set to the RCU_JIFFIES_TILL_FORCE_QS
 	 * value, which is a function of HZ, then adding one for each
 	 * RCU_JIFFIES_FQS_DIV CPUs that might be on the system.
+	 
+	 전역 변수 jiffies_till_first_fqs 및 jiffies_till_next_fqs 에 RCU_JIFFIES_TILL_FORCE_QS 딜레이 값을 디폴트로 대입하되 시스템의 HZ가 256을 넘어가는 케이스 및 online cpu 수가 256개를 초과하는 케이스에 대해 추가로  delay값을 증가하여 설정하다.
+
 	 */
 	d = RCU_JIFFIES_TILL_FORCE_QS + nr_cpu_ids / RCU_JIFFIES_FQS_DIV;
 	if (jiffies_till_first_fqs == ULONG_MAX)
 		jiffies_till_first_fqs = d;
 	if (jiffies_till_next_fqs == ULONG_MAX)
 		jiffies_till_next_fqs = d;
+	//
 
 	/* If the compile-time values are accurate, just leave. */
 	if (rcu_fanout_leaf == RCU_FANOUT_LEAF &&
 	    nr_cpu_ids == NR_CPUS)
 		return;
+	//rcu_fanout_leaf 값이 바뀌거나 실행되는 cpu의 갯수가 컴파일 타임에 설정한 수와 다른 경우 메시지를 출력하고 계속 진행한다.(즉 위 if문의 조건과 반대일 경우)
+	//fanout_leaf : 
 	pr_info("RCU: Adjusting geometry for rcu_fanout_leaf=%d, nr_cpu_ids=%d\n",
 		rcu_fanout_leaf, nr_cpu_ids);
 
@@ -4536,9 +4552,11 @@ static void __init rcu_init_geometry(void)
 	 * and cannot exceed the number of bits in the rcu_node masks.
 	 * Complain and fall back to the compile-time values if this
 	 * limit is exceeded.
+	 rcu_fanout_leaf는 최소 2개는 되어야 하고 rcu_node 마스크의 비트수를 넘어서는 안된다. 만약 이러한 제한을 넘어서면 complain and fall back(return)
 	 */
 	if (rcu_fanout_leaf < 2 ||
-	    rcu_fanout_leaf > sizeof(unsigned long) * 8) {
+	    rcu_fanout_leaf > sizeof(unsigned long) * 8) 
+	{
 		rcu_fanout_leaf = RCU_FANOUT_LEAF;
 		WARN_ON(1);
 		return;
@@ -4547,6 +4565,7 @@ static void __init rcu_init_geometry(void)
 	/*
 	 * Compute number of nodes that can be handled an rcu_node tree
 	 * with the given number of levels.
+	 주어진 트리의 레벨의 넘버와 함께 rcu노드 트리를 다룰수 있는 노드의 수를 계산
 	 */
 	rcu_capacity[0] = rcu_fanout_leaf;
 	for (i = 1; i < RCU_NUM_LVLS; i++)
@@ -4555,6 +4574,7 @@ static void __init rcu_init_geometry(void)
 	/*
 	 * The tree must be able to accommodate the configured number of CPUs.
 	 * If this limit is exceeded, fall back to the compile-time values.
+	 트리는 설정된 cpu의 수를 수용할수 있어야한다. 제한치가 넘어가면 기본 초기값으로 설정의된다
 	 */
 	if (nr_cpu_ids > rcu_capacity[RCU_NUM_LVLS - 1]) {
 		rcu_fanout_leaf = RCU_FANOUT_LEAF;
@@ -4563,17 +4583,20 @@ static void __init rcu_init_geometry(void)
 	}
 
 	/* Calculate the number of levels in the tree. */
+	//트리 레벨 계산
 	for (i = 0; nr_cpu_ids > rcu_capacity[i]; i++) {
 	}
 	rcu_num_lvls = i + 1;
 
 	/* Calculate the number of rcu_nodes at each level of the tree. */
+	//트리 각각의 레벨에서 rcu노드의 갯수를 구한다
 	for (i = 0; i < rcu_num_lvls; i++) {
 		int cap = rcu_capacity[(rcu_num_lvls - 1) - i];
 		num_rcu_lvl[i] = DIV_ROUND_UP(nr_cpu_ids, cap);
 	}
 
 	/* Calculate the total number of rcu_node structures. */
+	//rcu 노드 총 갯수
 	rcu_num_nodes = 0;
 	for (i = 0; i < rcu_num_lvls; i++)
 		rcu_num_nodes += num_rcu_lvl[i];
@@ -4604,11 +4627,16 @@ static void __init rcu_dump_rcu_node_tree(struct rcu_state *rsp)
 void __init rcu_init(void)
 {
 	int cpu;
+	//rcu 사용을 위해 구조체 초기화,cpu 및 pm 상태 변화에 따라 호출되는 각 함수들을 
+	//notify chain block에 등록, rcu 동작에 필요한 스레드들을 동작
+
 
 	rcu_early_boot_tests();
+	//CONFIG_PROVE_RCU 옵션이 사용된 경우 run self test를 선행
 
-	rcu_bootup_announce();
-	rcu_init_geometry();
+	rcu_bootup_announce();//동작 여부를 확인하기 위해 로그출력
+	rcu_init_geometry();//rcu_state 구조체 내부의 rcu_node 들에 대한 트리 기하를 구성하기 위한 설정 값들을 산출한다.
+
 	rcu_init_one(&rcu_bh_state);
 	rcu_init_one(&rcu_sched_state);
 	if (dump_tree)
