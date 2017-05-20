@@ -3144,7 +3144,12 @@ static inline int rcu_blocking_is_gp(void)
 
 /**
  * synchronize_sched - wait until an rcu-sched grace period has elapsed.
- *
+ * rcu-sched grace period가 지나갈때까지 기다린다 
+
+ --grace period : 노드를 변경하는 경우 기존 노드가 Reader에 의해 참조되는 경우 사용완료 까지 기다린다. grace period 기간 내에 새롭게 read-side 임계지점이 진행되는 reader들은 new노드(변경된 노드)에 대한 접근을 수행하기 때문에 grace period에 관여하지 않는다.
+
+ --RCU에서는 잠금을 사용하지 않는다. A변경을 위해 잠금대신 A를 복사하고 수정한 A`을 만든다. 그럼 시스템은 A와 A`을 동시에 갖고 있고 일정시간이 지나면 RCU는 A를 삭제한다. 즉 grace period는 A를 삭제해도 안전한 시점을 이야기한다.
+
  * Control will return to the caller some time after a full rcu-sched
  * grace period has elapsed, in other words after all currently executing
  * rcu-sched read-side critical sections have completed.   These read-side
@@ -3152,13 +3157,17 @@ static inline int rcu_blocking_is_gp(void)
  * rcu_read_unlock_sched(), and may be nested.  Note that preempt_disable(),
  * local_irq_disable(), and so on may be used in place of
  * rcu_read_lock_sched().
- *
+ * 
+ Control은 full rce-sched grace period가 지나가면 때때로 caller를 리턴시킨다 
+ 즉 현재 실행중인 모든 rcu-sched read-side 임계지점이 끝난 후. 이 read-side 임계지점은 rcu_read_lock_sched, rcu_read_unlock_shced에 의해 범위가 지정되고 둘러싸여진다. 
+
  * This means that all preempt_disable code sequences, including NMI and
  * non-threaded hardware-interrupt handlers, in progress on entry will
  * have completed before this primitive returns.  However, this does not
  * guarantee that softirq handlers will have completed, since in some
  * kernels, these handlers can run in process context, and can block.
  *
+ 이는 모든 preempt_disable 코드 순서가 primitive가 리턴되기전 완성될것을 의미
  * Note that this guarantee implies further memory-ordering guarantees.
  * On systems with more than one CPU, when synchronize_sched() returns,
  * each CPU is guaranteed to have executed a full memory barrier since the

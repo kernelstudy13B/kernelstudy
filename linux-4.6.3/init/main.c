@@ -621,7 +621,7 @@ asmlinkage __visible void __init start_kernel(void) //called by head.S
 
 	/* trace_printk() and trace points may be used after this */
 	trace_init();
-
+	//CONFIG_TRACING 커널 옵션이 설정된 경우 빌드되어 동작되며 트레이스용 버퍼 및 이벤트를 초기화
 	context_tracking_init();
 	radix_tree_init();
 	/* init some links before init_ISA_irqs() */

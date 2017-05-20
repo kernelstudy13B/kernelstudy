@@ -24,8 +24,11 @@
 /*
  * trace_clock_local(): the simplest and least coherent tracing clock.
  *
+ 가장 간단하고 최소한의 일관성있는 tracing의 clock
+ 
  * Useful for tracing that does not cross to other CPUs nor
  * does it go through idle events.
+ 다른 cPU들을 크로스하지 않는 트레이싱에 유용함
  */
 u64 notrace trace_clock_local(void)
 {

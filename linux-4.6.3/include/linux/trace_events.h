@@ -64,6 +64,7 @@ struct trace_entry {
 /*
  * Trace iterator - used by printout routines who present trace
  * results to users and which routines might sleep, etc:
+ //어떤 함수가 유저에게 trace 결과를 제공하는지 그리고 어떤 루틴이 sleep할지를 보여주는 구조체 필드들
  */
 struct trace_iterator {
 	struct trace_array	*tr;

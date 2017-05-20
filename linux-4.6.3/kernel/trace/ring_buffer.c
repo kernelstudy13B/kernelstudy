@@ -693,6 +693,7 @@ static inline u64 rb_time_stamp(struct ring_buffer *buffer)
 
 u64 ring_buffer_time_stamp(struct ring_buffer *buffer, int cpu)
 {
+	//버퍼에 clock 콜백을 넣고 timestamp를 찍어줌
 	u64 time;
 
 	preempt_disable_notrace();
@@ -1405,7 +1406,7 @@ EXPORT_SYMBOL_GPL(ring_buffer_free);
 void ring_buffer_set_clock(struct ring_buffer *buffer,
 			   u64 (*clock)(void))
 {
-	buffer->clock = clock;
+	buffer->clock = clock;//인덱스에 맞게 콜백함수 등록
 }
 
 static void rb_reset_cpu(struct ring_buffer_per_cpu *cpu_buffer);
@@ -3050,7 +3051,8 @@ static bool rb_per_cpu_empty(struct ring_buffer_per_cpu *cpu_buffer)
 /**
  * ring_buffer_record_disable - stop all writes into the buffer
  * @buffer: The ring buffer to stop writes to.
- *
+ * 버퍼로 모든 쓰기를 금지시킴
+   버퍼로의 모든 쓰기를 방지한다. 이 함수 이후 버퍼로의 쓰기 시도는 전부 실패 또는 NULL
  * This prevents all writes to the buffer. Any attempt to write
  * to the buffer after this will fail and return NULL.
  *

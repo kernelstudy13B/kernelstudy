@@ -339,7 +339,6 @@ static cycle_t buffer_ftrace_now(struct trace_buffer *buf, int cpu)
 	u64 ts;
 
 	/* Early boot up does not have a buffer yet */
-	//빠른 부트업은 버퍼를 아직 가지고 있지 않다
 	if (!buf->buffer)
 		return trace_clock_local();
 
@@ -347,7 +346,6 @@ static cycle_t buffer_ftrace_now(struct trace_buffer *buf, int cpu)
 	ring_buffer_normalize_time_stamp(buf->buffer, cpu, &ts);
 
 	return ts;
-	//ring buffer 타임 스탬프를 지정하고 그를 normalize하는 함수
 }
 
 cycle_t ftrace_now(int cpu)
@@ -1334,10 +1332,9 @@ void tracing_reset_online_cpus(struct trace_buffer *buf)
 	if (!buffer)
 		return;
 
-	ring_buffer_record_disable(buffer);//버퍼로의 쓰기를 disable 시킴
+	ring_buffer_record_disable(buffer);
 
 	/* Make sure all commits have finished */
-	//모든 commit이 끝남을 확실히 함
 	synchronize_sched();
 
 	buf->time_start = buffer_ftrace_now(buf, buf->cpu);
@@ -5231,7 +5228,6 @@ static int tracing_clock_show(struct seq_file *m, void *v)
 }
 
 static int tracing_set_clock(struct trace_array *tr, const char *clockstr)
-	//여기서 trace_array는 global_trace
 {
 	int i;
 
@@ -5245,16 +5241,13 @@ static int tracing_set_clock(struct trace_array *tr, const char *clockstr)
 	mutex_lock(&trace_types_lock);
 
 	tr->clock_id = i;
-	//ring_buffer : trace array 안에 trace_buffer안에 있고 그 버퍼안에 링버퍼가 포함
-	//tr->trace_buffer.buffer 가 링버퍼
+
 	ring_buffer_set_clock(tr->trace_buffer.buffer, trace_clocks[i].func);
 
 	/*
 	 * New clock may not be consistent with the previous clock.
 	 * Reset the buffer so that it doesn't have incomparable timestamps.
 	 */
-	//새로운 클록은 이전의 클록과 일관적이지 않을수 있다.
-	//비교할수 없는 타임스탬프를 가지지 않도록 하기위해 버퍼를 리셋
 	tracing_reset_online_cpus(&tr->trace_buffer);
 
 #ifdef CONFIG_TRACER_MAX_TRACE
@@ -7266,7 +7259,6 @@ __init static int tracer_alloc_buffers(void)
 		goto out_free_temp_buffer;
 
 	/* TODO: make the number of buffers hot pluggable with CPUS */
-	//hotplug가 가능한 상태의 cpu 수를 만듬
 	if (allocate_trace_buffers(&global_trace, ring_buf_size) < 0) {
 		printk(KERN_ERR "tracer: failed to allocate ring buffer!\n");
 		WARN_ON(1);
