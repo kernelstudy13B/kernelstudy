@@ -197,11 +197,16 @@ struct trace_array {
 	 * latency is reached, or when the user initiates a snapshot.
 	 * Some tracers will use this to store a maximum trace while
 	 * it continues examining live traces.
-	 *
+	 * maxbuffer는 maximum latency(최대지연)에 도달할떄 또는 유저가 스냅샷을 초기화할때
+	 트레이스를 스냅샷하기 위해 사용된다. 몇몇 트레이서들은 live 트레이스들을 계속 검사
+	 하는 동안 'maximum 트레이스'를 저장하기 위해 이 버퍼를 사용할 것이다.
 	 * The buffers for the max_buffer are set up the same as the trace_buffer
 	 * When a snapshot is taken, the buffer of the max_buffer is swapped
 	 * with the buffer of the trace_buffer and the buffers are reset for
-	 * the trace_buffer so the tracing can continue.
+	 * the trace_buffer so the tracing can continue.ㅁ
+	 max buffer를 위한 buffer들은 스냅샷이 실행될떄 trace buffer로써 똑같이 셋업되고
+	 max buffer의 버퍼는 trace buffer의 버퍼와 스왑되고 버퍼들은 트레이싱이 계속 될수 있
+	 도록 trace buffer를 위해 리셋된다.
 	 */
 	struct trace_buffer	max_buffer;
 	bool			allocated_snapshot;
@@ -213,13 +218,17 @@ struct trace_array {
 	 * when taking a max snapshot. The buffers themselves are
 	 * protected by per_cpu spinlocks. But the action of the swap
 	 * needs its own lock.
-	 *
+	 * max_lock은 맥스 스냅샷을 실행할때 버퍼의 스와핑을 보호하기 위해 사용된다.
+	 버퍼들 그자체는 per_cpu 스핀락에 의해 보호된다. 그러나 스왑의 액션은 자신들이 소유한 lock을 필요로 한다.
+	 -'버퍼 자신들의 보호'(각각의 cpu들의 버퍼를 위한 보호?)는 per-cpu의 스핀락을 사용
+	 -스왑액션(버퍼들(trace_buffer, max_buffer)을 위해 필요로 한 max_lock
 	 * This is defined as a arch_spinlock_t in order to help
 	 * with performance when lockdep debugging is enabled.
-	 *
+	 * 이는 lockdep 디버깅이 가능할떄 퍼포먼스에 대한 도움을 주기 위한 arch_spinlock_t로써 정의된다.
 	 * It is also used in other places outside the update_max_tr
 	 * so it needs to be defined outside of the
 	 * CONFIG_TRACER_MAX_TRACE.
+	 또한 CONIFG~의 외부에서 필요로 하므로 update_max_tr 밖에서도 사용될 수 있다.
 	 */
 	arch_spinlock_t		max_lock;
 	int			buffer_disabled;

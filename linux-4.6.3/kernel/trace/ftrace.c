@@ -5158,7 +5158,7 @@ static void ftrace_update_trampoline(struct ftrace_ops *ops)
 __init void ftrace_init_global_array_ops(struct trace_array *tr)
 {
 	tr->ops = &global_ops;
-	tr->ops->private = tr;
+	tr->ops->private = tr;//?? 
 }
 
 void ftrace_init_array_ops(struct trace_array *tr, ftrace_func_t func)

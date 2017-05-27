@@ -156,6 +156,7 @@ struct ftrace_ops_hash {
  * Any private data added must also take care not to be freed and if private
  * data is added to a ftrace_ops that is in core code, the user of the
  * ftrace_ops must perform a schedule_on_each_cpu() before freeing it.
+ private -- 들어간 private 데이터는 반드시 이 구조체에서 벗어나지 않도록 케어되어야 하며 반약 private 데이터가 코어코드 안에 있는 ftrace_ops에 더해진다면 ftrace_ops의 유저는 free하기 이전에 schedule_on_each_cpu를 수행해야한다
  */
 struct ftrace_ops {
 	ftrace_func_t			func;

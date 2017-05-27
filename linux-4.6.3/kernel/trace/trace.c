@@ -1167,6 +1167,10 @@ static int run_tracer_selftest(struct tracer *type)
 	 * tracer to be this tracer. The tracer can then run some
 	 * internal tracing to verify that everything is in order.
 	 * If we fail, we do not register this tracer.
+	 현재 tracer에 대한 셀프테스트 수행
+	 려시ㅛㅓ trace buffer를 리셋하고 current tracer가 세팅된다. 그 tracer는 그리고나서
+	 모두가 순서대로 되어있음을 증명하기 위해 내부 트레이싱을 작동시킬수 있다.
+	 실패한다면 이 tracer를 register하지 않는다.
 	 */
 	tracing_reset_online_cpus(&tr->trace_buffer);
 
@@ -1175,6 +1179,7 @@ static int run_tracer_selftest(struct tracer *type)
 #ifdef CONFIG_TRACER_MAX_TRACE
 	if (type->use_max_tr) {
 		/* If we expanded the buffers, make sure the max is expanded too */
+		//버퍼(trace_buffer)를 확장했다면 max 버퍼 역시 확장
 		if (ring_buffer_expanded)
 			ring_buffer_resize(tr->max_buffer.buffer, trace_buf_size,
 					   RING_BUFFER_ALL_CPUS);
@@ -1185,8 +1190,11 @@ static int run_tracer_selftest(struct tracer *type)
 	/* the test is responsible for initializing and enabling */
 	pr_info("Testing tracer %s: ", type->name);
 	ret = type->selftest(type, tr);
+	//type인 nop와 trace array가 인자로 들어가 그에따른 셀프테스트가 진행.
 	/* the test is responsible for resetting too */
 	tr->current_trace = saved_tracer;
+	//부팅과정에서는 무조건 셀프테스트를 nop로 실행
+	//만약 초기 설정이 nop가 아니었다면 saved_tracer에 저장을 해놓고 그다음 nop를 실행하고 저장해놨던 tracer를 다시 원래대로 되돌려놓는다
 	if (ret) {
 		printk(KERN_CONT "FAILED!\n");
 		/* Add the warning after printing 'FAILED' */
@@ -1194,13 +1202,16 @@ static int run_tracer_selftest(struct tracer *type)
 		return -1;
 	}
 	/* Only reset on passing, to avoid touching corrupted buffers */
+	//버퍼충돌을 피하기 위해 패싱 리셋
 	tracing_reset_online_cpus(&tr->trace_buffer);
 
 #ifdef CONFIG_TRACER_MAX_TRACE
+	//셀프 테스트가 끝난 후 다시 되돌려 놓는 과정
 	if (type->use_max_tr) {
 		tr->allocated_snapshot = false;
 
 		/* Shrink the max buffer again */
+		//max buffer의 사이즈를 다시 줄인다
 		if (ring_buffer_expanded)
 			ring_buffer_resize(tr->max_buffer.buffer, 1,
 					   RING_BUFFER_ALL_CPUS);
@@ -1224,6 +1235,7 @@ static void __init apply_trace_boot_options(void);
 /**
  * register_tracer - register a tracer with the ftrace system.
  * @type - the plugin for the tracer
+ //ftracer 시스템에서 tracer를 등록
  *
  * Register a new plugin tracer.
  */
@@ -1272,6 +1284,7 @@ int __init register_tracer(struct tracer *type)
 			type->flags->opts = dummy_tracer_opt;
 
 	/* store the tracer for __set_tracer_option */
+	//__set_tracer_option을 위해 tracer를 저장
 	type->flags->trace = type;
 
 	ret = run_tracer_selftest(type);
@@ -1280,13 +1293,15 @@ int __init register_tracer(struct tracer *type)
 
 	type->next = trace_types;
 	trace_types = type;
-	add_tracer_options(&global_trace, type);
+	add_tracer_options(&global_trace, type);//트레이서의 옵션을 추가하는 부분
+	//개념이 복잡함
 
  out:
-	tracing_selftest_running = false;
+	tracing_selftest_running = false; //selftest 막음
 	mutex_unlock(&trace_types_lock);
 
 	if (ret || !default_bootup_tracer)
+		//default_bootup_tracer는 문자열
 		goto out_unlock;
 
 	if (strncmp(default_bootup_tracer, type->name, MAX_TRACER_SIZE))
@@ -1294,12 +1309,14 @@ int __init register_tracer(struct tracer *type)
 
 	printk(KERN_INFO "Starting tracer '%s'\n", type->name);
 	/* Do we want this tracer to start on bootup? */
-	tracing_set_tracer(&global_trace, type->name);
+	//우리는 부트업할때 이 트레이서가 스타트 되길 원하나?
+	tracing_set_tracer(&global_trace, type->name);//원한다
 	default_bootup_tracer = NULL;
 
-	apply_trace_boot_options();
+	apply_trace_boot_options();//부트옵션으로 스타트 되길 원한 트레이서를 적용
 
 	/* disable other selftests, since this will break it. */
+	//break가 되므로 다른 셀프테스트들을 disable
 	tracing_selftest_disabled = true;
 #ifdef CONFIG_FTRACE_STARTUP_TEST
 	printk(KERN_INFO "Disabling FTRACE selftests due to running tracer '%s'\n",
@@ -3266,11 +3283,14 @@ static int tracing_open(struct inode *inode, struct file *file)
  * Some tracers are not suitable for instance buffers.
  * A tracer is always available for the global array (toplevel)
  * or if it explicitly states that it is.
+ 몇몇 트레이서들은 인스턴스 버퍼(?)에 부적합하다.
+ 트레이서는 globaly array를 위해 또는 명시적으로 그것이 글로벌 array임을 나타낸다면 트레이서는 항상 사용가능하다
  */
 static bool
 trace_ok_for_array(struct tracer *t, struct trace_array *tr)
 {
 	return (tr->flags & TRACE_ARRAY_FL_GLOBAL) || t->allow_instances;
+	//왼쪽 : global array인가 //오른쪽 : 명시적
 }
 
 /* Find the next tracer that this trace array may use */
@@ -3650,6 +3670,7 @@ static void __init apply_trace_boot_options(void)
 			trace_set_options(&global_trace, option);
 
 		/* Put back the comma to allow this to be called again */
+		//다시 호출될수 있도록 하기 위해 콤마를 풋백
 		if (buf)
 			*(buf - 1) = ',';
 	}
@@ -4375,6 +4396,7 @@ static void tracing_set_nop(struct trace_array *tr)
 static void add_tracer_options(struct trace_array *tr, struct tracer *t)
 {
 	/* Only enable if the directory has been created already. */
+	//디렉토리가 미리 생성이 되어있어야 실행 가능한 함수 
 	if (!tr->dir)
 		return;
 
@@ -6411,12 +6433,14 @@ create_trace_option_files(struct trace_array *tr, struct tracer *tracer)
 	/*
 	 * If this is an instance, only create flags for tracers
 	 * the instance may have.
+	 //만약 인스턴스라면 그 인스턴스가 가질수 있는 트레이서를 위한 플래그를 만들어라
 	 */
 	if (!trace_ok_for_array(tracer, tr))
 		return;
 
 	for (i = 0; i < tr->nr_topts; i++) {
 		/* Make sure there's no duplicate flags. */
+		//복제된 플래그가 없어야 한다
 		if (WARN_ON_ONCE(tr->topts[i].tracer->flags == tracer->flags))
 			return;
 	}
@@ -6619,6 +6643,7 @@ static void free_trace_buffers(struct trace_array *tr)
 
 static void init_trace_flags_index(struct trace_array *tr)
 {
+	//flag들의 인덱스를 초기화
 	int i;
 
 	/* Used by the trace options files */
@@ -7287,16 +7312,20 @@ __init static int tracer_alloc_buffers(void)
 	 * register_tracer() might reference current_trace, so it
 	 * needs to be set before we register anything. This is
 	 * just a bootstrap of current_trace anyway.
+	 register_tracer 함수는 current_trace를 참조할수 있으므로 어떤것을 register하기 전에
+	 셋팅되어야 하는 함수. 이는 어쨌든 current_trace의 부트스트랩일 뿐이다.
 	 */
 	global_trace.current_trace = &nop_trace;
+	//nop tracer : 디폴트 설정이며 "trace nothing" tracer. 즉 아무것도 아닌 트레이서.
+	//트레이싱으로부터 모든 트레이스를 제거하기 위해 current_tracer에 nop를 echo 한다
 
 	global_trace.max_lock = (arch_spinlock_t)__ARCH_SPIN_LOCK_UNLOCKED;
 
 	ftrace_init_global_array_ops(&global_trace);
 
-	init_trace_flags_index(&global_trace);
+	init_trace_flags_index(&global_trace);//인덱스의 값을 배열 인덱스의 값과 똑같이 넣어줌
 
-	register_tracer(&nop_trace);
+	register_tracer(&nop_trace);//부트업시 nop를 tracer로 둠.
 
 	/* All seems OK, enable tracing */
 	tracing_disabled = 0;
