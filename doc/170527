@@ -1,0 +1,75 @@
+분석함수 : trace_init()
+리눅스 자체에 있는 debugging용 ftrace 유틸리티를 사용하기 위한 초기화 단계.
+CONFIG_TRACING을 on 할 경우 trace buffer와 event를 초기화 해준다.
+linux ftrace, trace 유틸리티를 위한 초기화 단계.
+
+주요 구조체 : struct trace_array
+/*
+ * The trace array - an array of per-CPU trace arrays. This is the
+ * highest level data structure that individual tracers deal with.
+ * They have on/off state as well:
+ */
+ 각 CPU마다(per-cpu) trace_array라는 구조체가 할당이 된다.
+struct trace_array{
+  	...
+  	struct trace_buffer trace_buffer;
+  	struct trace_buffer max_buffer;
+	...
+}
+
+struct trace_buffer{
+	...
+	struct ring_buffer      *buffer;
+	cycle_t             time_start;
+	...
+}
+
+struct trace {
+	const char * name;
+	...
+}
+
+1. trace_array.trace_buffer
+ftrace 유틸리티를 사용해서 함수 호출 순서등을 보고자 할 때 사용하는 버퍼
+
+1-(1) trace_buffer->buffer
+링 버퍼를 사용해서 저장한다.
+1-(2) trace_buffer.time_start
+(guess) 함수 시작 시간 정보도 같이 저장한다.
+
+2. trace_array.max_buffer
+tracing을 하는 것도 있지만 현재 시스템의 snapshot을 쓸 경우를 대비해서 buffer를 만들어 놓는다. 
+
+https://www.systutorials.com/docs/linux/man/1-trace-cmd-show/
+위 링크에서는 linux kernel tracing buffer 내용을 볼 수 있는 trace-cm.d-show 유틸리티 man page인데 다음과 같은 옵션이 존재한다.
+
+-s
+Instead of reading the "trace" file, read the snapshot file. 
+The snapshot is made by an application writing into it and the kernel will perform as swap between 
+the currently active buffer and the current snapshot buffer. If no more swaps are made, 
+the snapshot will remain static. This is not a consuming read.
+
+(guess) snapshot을 찍을 때에는 max_buffer에다가 정보를 저장한다? 저장할 때 현재 active trace buffer대신 max_buffer로 swap 시킨 뒤
+저장한다는 뜻?
+
+3. struct tracer
+
+ftrace를 사용할 때 file에다 tracer 종류를 써서 ftrace로 그 종류에 맞는 tracing기능 을 쓸 수 있다.
+
+형식 :
+echo 'tracer' > 'file'
+
+예시 :
+echo nops > current_tracer
+echo function_graph > current_tracer
+
+이때 'tracer' 종류에 대한 정보를 저장하는 구조체가 struct tracer 이다.
+
+register_tracer(struct tracer *type)에서 넘겨준 struct tracer를 
+(guess) add_tracer_options 함수를 통해 등록한다.
+
+3-(1) struct tracer * trace_types __read_mostly
+trace_types는 등록한 struct tracer 구조체 linked list의 head list이다. register_tracer 함수에서 tracer를 등록시킬 때 사용된다. 
+
+
+
